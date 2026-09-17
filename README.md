@@ -23,6 +23,8 @@ curl -X POST http://localhost:8787/orders \
 curl 'http://localhost:8787/orders?instanceId=<instanceId>'
 ```
 
+点单页位于 `/menu`，店名、菜品和价格从数据库动态读取。菜单、店铺配置和订单表的建表 SQL 见 [`ORDER_MENU_SCHEMA.md`](ORDER_MENU_SCHEMA.md)。管理员修改接口需要配置 `ADMIN_SESSION_SECRET`。
+
 ## 部署
 
 ```bash
