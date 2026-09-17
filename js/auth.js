@@ -6,6 +6,7 @@ const page = document.body.dataset.page;
 function setMessage(text, type = "error") {
   message.textContent = text;
   message.className = `form-message ${type}`;
+  message.hidden = !text;
 }
 
 function createSalt() {
@@ -107,7 +108,7 @@ async function submitAuth(event) {
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || "请求失败，请稍后重试。");
     setMessage(page === "register" ? "注册成功，即将前往登录页面。" : "登录成功。", "success");
-    if (page === "register") setTimeout(() => { window.location.href = "./login.html"; }, 800);
+    if (page === "register") setTimeout(() => { window.location.href = "/"; }, 800);
   } catch (error) {
     setMessage(error.message);
   } finally {
@@ -117,3 +118,14 @@ async function submitAuth(event) {
 }
 
 form.addEventListener("submit", submitAuth);
+
+document.querySelectorAll(".toggle-password").forEach((button) => {
+  button.addEventListener("click", () => {
+    const input = document.getElementById(button.dataset.target);
+    const visible = input.type === "text";
+    input.type = visible ? "password" : "text";
+    button.textContent = visible ? "显示" : "隐藏";
+    button.setAttribute("aria-label", `${visible ? "显示" : "隐藏"}密码`);
+    button.setAttribute("aria-pressed", String(!visible));
+  });
+});

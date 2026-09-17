@@ -24,14 +24,19 @@
         <form id="auth-form" novalidate>
           <label for="username">用户名</label>
           <input id="username" name="username" type="text" autocomplete="username"
-            placeholder="请输入用户名" minlength="3" maxlength="32" required />
+            placeholder="请输入用户名" minlength="3" maxlength="32"
+            pattern="[\p{L}\p{N}_-]{3,32}" required />
 
           <label for="password">密码</label>
-          <input id="password" name="password" type="password"
-            autocomplete="current-password" placeholder="请输入密码" minlength="8" required />
+          <div class="password-wrapper">
+            <input id="password" name="password" type="password"
+              autocomplete="current-password" placeholder="请输入密码" minlength="8" required />
+            <button type="button" class="toggle-password" data-target="password"
+              aria-label="显示密码" aria-pressed="false">显示</button>
+          </div>
 
           <button id="submit-button" type="submit">登录</button>
-          <p id="form-message" class="form-message" role="alert" aria-live="polite"></p>
+          <p id="form-message" class="form-message" role="alert" aria-live="polite" hidden></p>
         </form>
 
         <p class="switch-page">还没有账户？<a href="/register">立即注册</a></p>
