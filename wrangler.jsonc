@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "ordersystem-workflow",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-17",
+  "observability": {
+    "enabled": true
+  },
+  "workflows": [
+    {
+      "name": "order-processing",
+      "binding": "ORDER_WORKFLOW",
+      "class_name": "OrderWorkflow"
+    }
+  ]
+}
