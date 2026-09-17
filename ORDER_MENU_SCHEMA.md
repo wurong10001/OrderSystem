@@ -6,9 +6,6 @@
 create table public.store_settings (
   id integer primary key default 1 check (id = 1),
   store_name varchar(100) not null,
-  admin_username varchar(32) not null,
-  admin_salt char(32) not null,
-  admin_password_hash char(64) not null,
   updated_at timestamptz not null default now()
 );
 
@@ -41,10 +38,9 @@ create table public.order_items (
 );
 
 insert into public.store_settings
-  (id, store_name, admin_username, admin_salt, admin_password_hash)
+  (id, store_name)
 values
-  (1, '我的店铺', 'admin', '0123456789abcdef0123456789abcdef',
-   '0000000000000000000000000000000000000000000000000000000000000000')
+  (1, '我的店铺')
 on conflict (id) do nothing;
 
 alter table public.store_settings enable row level security;
@@ -53,14 +49,26 @@ alter table public.orders enable row level security;
 alter table public.order_items enable row level security;
 ```
 
-`admin_password_hash` 使用现有前端约定的 `SM3(admin_salt + ":" + 密码)`。部署前必须把示例哈希替换为真实的 64 位十六进制值，否则示例管理员无法登录。启用 RLS 后不创建匿名 policy，Worker 通过 Hyperdrive 连接执行查询。
+管理员账户来自 `app_users`：`permission` 为 `1` 的用户是管理员，`NULL` 或 `0` 是普通用户，`2` 是外卖员。管理员密码仍使用 `app_users.salt` 和 `app_users.password_hash`。启用 RLS 后不创建匿名 policy，Worker 通过 Hyperdrive 连接执行查询。
+
+已有数据库迁移：
+
+```sql
+alter table public.store_settings drop column if exists admin_username;
+alter table public.store_settings drop column if exists admin_salt;
+alter table public.store_settings drop column if exists admin_password_hash;
+alter table public.app_users add column if not exists permission smallint;
+alter table public.app_users
+  add constraint app_users_permission_value
+  check (permission is null or permission in (0, 1, 2));
+```
 
 ## 接口
 
 - `GET /menu`：显示当前店名和所有在售菜品。
 - `POST /api/orders`：提交 `{ "customerName": "...", "items": [{ "id": 1, "quantity": 2 }] }`。
 - `POST /api/admin/login`：提交管理员用户名和 `passwordHash`，成功后设置 HttpOnly 会话 Cookie。
-- `PUT /api/admin/settings`：登录后修改 `{ "storeName": "...", "adminUsername": "..." }`。
+- `PUT /api/admin/settings`：登录后修改 `{ "storeName": "..." }`。管理员用户名和权限在 `app_users` 中维护。
 - `GET/POST/PATCH/DELETE /api/admin/menu[/:id]`：登录后动态管理菜品、价格、描述、排序和在售状态。
 
 管理员会话签名需要配置 Cloudflare Secret：

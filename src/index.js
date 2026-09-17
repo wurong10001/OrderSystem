@@ -73,7 +73,7 @@ async function validSession(request, env) {
   const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(
     atob(encoded.replace(/-/g, "+").replace(/_/g, "/") + "=="), (char) => char.charCodeAt(0),
   )));
-  return payload.exp > Date.now() && typeof payload.username === "string";
+  return payload.exp > Date.now() && payload.permission === 1 && typeof payload.username === "string";
 }
 
 function adminCookie(token, maxAge = 86400) {
@@ -108,18 +108,20 @@ async function adminRequest(request, env, pathname) {
   try {
     if (pathname === "/api/admin/login" && request.method === "POST") {
       const body = await jsonBody(request);
-      const [settings] = await sql`
-        select admin_username, admin_password_hash
-        from public.store_settings where id = 1
+      const [user] = await sql`
+        select username, password_hash, permission
+        from public.app_users
+        where username_normalized = ${body?.username?.trim().toLowerCase() || ""}
+          and permission = 1
+        limit 1
       `;
-      if (!settings || body?.username !== settings.admin_username ||
-          body?.passwordHash?.toLowerCase() !== settings.admin_password_hash.toLowerCase()) {
+      if (!user || body?.passwordHash?.toLowerCase() !== user.password_hash.toLowerCase()) {
         return Response.json({ error: "用户名或密码错误。" }, { status: 401 });
       }
       if (!env.ADMIN_SESSION_SECRET) {
         return Response.json({ error: "ADMIN_SESSION_SECRET 未配置。" }, { status: 503 });
       }
-      const token = await signSession({ username: settings.admin_username, exp: Date.now() + 86400000 }, env.ADMIN_SESSION_SECRET);
+      const token = await signSession({ username: user.username, permission: user.permission, exp: Date.now() + 86400000 }, env.ADMIN_SESSION_SECRET);
       return new Response(JSON.stringify({ ok: true }), {
         status: 200, headers: { "Content-Type": "application/json", "Set-Cookie": adminCookie(token) },
       });
@@ -137,13 +139,12 @@ async function adminRequest(request, env, pathname) {
 
     if (pathname === "/api/admin/settings" && request.method === "PUT") {
       const body = await jsonBody(request);
-      if (!body || typeof body.storeName !== "string" || typeof body.adminUsername !== "string" ||
-          !body.storeName.trim() || !/^[\p{L}\p{N}_-]{3,32}$/u.test(body.adminUsername)) {
-        return Response.json({ error: "店名或管理员用户名无效。" }, { status: 400 });
+      if (!body || typeof body.storeName !== "string" || !body.storeName.trim()) {
+        return Response.json({ error: "店名无效。" }, { status: 400 });
       }
       await sql`
         update public.store_settings
-        set store_name = ${body.storeName.trim()}, admin_username = ${body.adminUsername.trim()}, updated_at = now()
+        set store_name = ${body.storeName.trim()}, updated_at = now()
         where id = 1
       `;
       return Response.json({ ok: true });

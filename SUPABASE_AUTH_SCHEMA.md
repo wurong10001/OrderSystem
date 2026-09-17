@@ -15,6 +15,7 @@ create table public.app_users (
 
   salt char(32) not null,
   password_hash char(64) not null,
+  permission smallint,
 
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -29,12 +30,24 @@ create table public.app_users (
     check (salt ~ '^[0-9a-fA-F]{32}$'),
 
   constraint app_users_password_hash_format
-    check (password_hash ~ '^[0-9a-fA-F]{64}$')
+    check (password_hash ~ '^[0-9a-fA-F]{64}$'),
+
+  constraint app_users_permission_value
+    check (permission is null or permission in (0, 1, 2))
 );
 
 create unique index app_users_username_normalized_idx
   on public.app_users (username_normalized);
 ```
+
+  已有数据库执行：
+
+  ```sql
+  alter table public.app_users add column if not exists permission smallint;
+  alter table public.app_users
+    add constraint app_users_permission_value
+    check (permission is null or permission in (0, 1, 2));
+  ```
 
 ## 2. 字段说明
 
@@ -44,6 +57,7 @@ create unique index app_users_username_normalized_idx
 | `username.toLowerCase()` | `username_normalized` | 用于忽略大小写查询和防止重复注册 |
 | `salt` | `salt` | 16 字节随机盐，保存为 32 位十六进制字符串 |
 | `passwordHash` | `password_hash` | SM3 输出，保存为 64 位十六进制字符串 |
+| `permission` | `permission` | `NULL` 或 `0` 普通用户，`1` 管理员，`2` 外卖员 |
 
 ## 3. 注册接口需要保存的数据
 
