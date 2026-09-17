@@ -29,18 +29,22 @@ curl 'http://localhost:8787/orders?instanceId=<instanceId>'
 npm run deploy
 ```
 
-数据库连接字符串不要写入 `wrangler.jsonc` 或提交到 Git。使用 Wrangler Secret 配置 Supabase：
+生产环境通过 Hyperdrive 访问 Supabase，数据库连接字符串不要写入 `wrangler.jsonc` 或提交到 Git。当前配置使用 `DATABASE_URL` 绑定（ID 已写入 `wrangler.jsonc`）。
+
+本地运行 `wrangler dev` 时，在未提交的 `.dev.vars` 中提供本地数据库连接串：
 
 ```bash
-printf '%s' 'postgresql://<user>:<password>@<host>:6543/postgres' | npx wrangler secret put DATABASE_URL
+cat > .dev.vars <<'EOF'
+DATABASE_URL_LOCAL_CONNECTION_STRING=postgresql://<user>:<password>@<host>:6543/postgres
+EOF
 ```
 
-部署后，Worker 中可通过 `env.DATABASE_URL` 读取该 Secret。开发环境可将同名变量写入未提交的 `.dev.vars`：
+部署前确认 Hyperdrive 配置指向正确的数据库。应用代码应通过 `env.DATABASE_URL.connectionString` 获取连接串；本地开发时可使用 `.dev.vars` 中的连接串作为替代：
 
 ```text
-DATABASE_URL=postgresql://<user>:<password>@<host>:6543/postgres
+DATABASE_URL_LOCAL_CONNECTION_STRING=postgresql://<user>:<password>@<host>:6543/postgres
 ```
 
-如果数据库密码曾经被公开，请先在 Supabase 控制台轮换密码，再重新执行上述命令。
+如果数据库密码曾经被公开，请先在 Supabase 控制台轮换密码，再更新 Hyperdrive 的目标连接配置。
 
 将 `src/workflow.js` 中的示例步骤替换为真实的支付、库存和通知服务调用。生产环境中建议通过 Wrangler secrets 配置 API 凭据，不要把密钥写入代码或 `wrangler.jsonc`。

@@ -3,9 +3,18 @@
   "name": "ordersystem-workflow",
   "main": "src/index.js",
   "compatibility_date": "2026-09-17",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "observability": {
     "enabled": true
   },
+  "hyperdrive": [
+    {
+      "binding": "DATABASE_URL",
+      "id": "3ca2bac3d67c4012a5c04f873e9ed3b2"
+    }
+  ],
   "rules": [
     {
       "type": "Text",
