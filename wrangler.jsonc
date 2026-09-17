@@ -6,6 +6,17 @@
   "observability": {
     "enabled": true
   },
+  "rules": [
+    {
+      "type": "Text",
+      "globs": [
+        "**/html/*.html",
+        "**/css/*.css",
+        "**/js/auth.js"
+      ],
+      "fallthrough": false
+    }
+  ],
   "workflows": [
     {
       "name": "order-processing",

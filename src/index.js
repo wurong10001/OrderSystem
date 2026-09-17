@@ -1,13 +1,35 @@
 import { OrderWorkflow } from "./workflow";
+import loginHtml from "../html/login.html";
+import registerHtml from "../html/register.html";
+import authCss from "../css/auth.css";
+import authJs from "../js/auth.js";
 
 export { OrderWorkflow };
+
+function assetResponse(content, contentType) {
+  return new Response(content, {
+    headers: { "Content-Type": `${contentType}; charset=UTF-8` },
+  });
+}
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
     if (request.method === "GET" && url.pathname === "/") {
-      return new Response("Hello World");
+      return assetResponse(loginHtml, "text/html");
+    }
+
+    if (request.method === "GET" && url.pathname === "/register") {
+      return assetResponse(registerHtml, "text/html");
+    }
+
+    if (request.method === "GET" && url.pathname === "/css/auth.css") {
+      return assetResponse(authCss, "text/css");
+    }
+
+    if (request.method === "GET" && url.pathname === "/js/auth.js") {
+      return assetResponse(authJs, "text/javascript");
     }
 
     if (request.method === "POST" && url.pathname === "/orders") {
