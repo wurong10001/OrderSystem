@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="订单系统注册" />
+    <title>注册 - OrderSystem</title>
+    <link rel="stylesheet" href="../css/auth.css" />
+  </head>
+  <body data-page="register">
+    <main class="auth-layout">
+      <section class="auth-intro">
+        <p class="eyebrow">ORDERSYSTEM</p>
+        <h1>让订单流程，<span>清晰可控。</span></h1>
+        <p class="intro-copy">创建账户，开始使用订单处理工作流。</p>
+      </section>
+
+      <section class="auth-card" aria-labelledby="page-title">
+        <div class="brand-mark" aria-hidden="true">OS</div>
+        <p class="card-kicker">加入 OrderSystem</p>
+        <h2 id="page-title">创建账户</h2>
+        <p class="card-description">只需用户名和密码即可注册</p>
+
+        <form id="auth-form" novalidate>
+          <label for="username">用户名</label>
+          <input id="username" name="username" type="text" autocomplete="username"
+            placeholder="3-32 个字符" minlength="3" maxlength="32" required />
+
+          <label for="password">密码</label>
+          <input id="password" name="password" type="password"
+            autocomplete="new-password" placeholder="至少 8 个字符" minlength="8" required />
+
+          <label for="confirm-password">确认密码</label>
+          <input id="confirm-password" name="confirmPassword" type="password"
+            autocomplete="new-password" placeholder="再次输入密码" minlength="8" required />
+
+          <button id="submit-button" type="submit">注册</button>
+          <p id="form-message" class="form-message" role="alert" aria-live="polite"></p>
+        </form>
+
+        <p class="switch-page">已有账户？<a href="./login.html">返回登录</a></p>
+      </section>
+    </main>
+    <script src="../js/auth.js"></script>
+  </body>
+</html>
