@@ -3,6 +3,7 @@ import postgres from "postgres";
 import loginHtml from "../html/login.html";
 import registerHtml from "../html/register.html";
 import adminMenuHtml from "../html/admin-menu.html";
+import orderingHtml from "../html/ordering.html";
 import authCss from "../css/auth.css";
 import authJs from "../js/auth.js";
 import adminMenuJs from "../js/admin-menu.js";
@@ -387,6 +388,139 @@ export default {
 
     if (request.method === "GET" && url.pathname === "/js/admin-menu.js") {
       return assetResponse(adminMenuJs, "text/javascript");
+    }
+
+    if (request.method === "GET" && url.pathname === "/ordering") {
+      return assetResponse(orderingHtml, "text/html");
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/menu/items") {
+      try {
+        const sql = database(env);
+        const items = await sql`
+          select id, item_code, name, description, flavors, price
+          from public.menu_items
+          where active = true
+          order by sort_order, id
+        `;
+        await sql.end({ timeout: 1 });
+        return Response.json(items);
+      } catch (error) {
+        console.error("Menu items fetch failed", error);
+        return Response.json({ error: "菜单暂时不可用" }, { status: 503 });
+      }
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/store/settings") {
+      try {
+        const sql = database(env);
+        const [settings] = await sql`select store_name from public.store_settings where id = 1`;
+        await sql.end({ timeout: 1 });
+        return Response.json(settings || { store_name: "点单菜单" });
+      } catch (error) {
+        return Response.json({ store_name: "点单菜单" });
+      }
+    }
+
+    if (url.pathname === "/api/orders" && request.method === "GET") {
+      try {
+        const sql = database(env);
+        const cookies = parseCookies(request);
+        const token = cookies.ordersystem_admin;
+        
+        // Check if admin
+        let isAdmin = false;
+        let userId = null;
+        if (token) {
+          try {
+            const [encoded] = token.split(".");
+            const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(
+              atob(encoded.replace(/-/g, "+").replace(/_/g, "/") + "=="), (char) => char.charCodeAt(0),
+            )));
+            if (payload.exp > Date.now()) {
+              isAdmin = payload.permission === 1;
+              userId = payload.userId;
+            }
+          } catch (e) { /* ignore */ }
+        }
+
+        let orders;
+        if (isAdmin) {
+          // Admin sees all orders
+          orders = await sql`
+            select o.*, 
+              (select json_agg(json_build_object('name', oi.item_name, 'price', oi.unit_price, 'quantity', oi.quantity))
+               from public.order_items oi where oi.order_id = o.id) as items
+            from public.orders o
+            order by o.created_at desc
+            limit 100
+          `;
+        } else if (userId) {
+          // Delivery person sees only their assigned orders
+          orders = await sql`
+            select o.*,
+              (select json_agg(json_build_object('name', oi.item_name, 'price', oi.unit_price, 'quantity', oi.quantity))
+               from public.order_items oi where oi.order_id = o.id) as items
+            from public.orders o
+            where o.delivery_user_id = ${userId}
+            order by o.created_at desc
+            limit 100
+          `;
+        } else {
+          await sql.end({ timeout: 1 });
+          return Response.json({ error: "需要登录" }, { status: 401 });
+        }
+        
+        await sql.end({ timeout: 1 });
+        return Response.json(orders);
+      } catch (error) {
+        console.error("Orders fetch failed", error);
+        return Response.json({ error: "获取订单失败" }, { status: 503 });
+      }
+    }
+
+    if (url.pathname.match(/^\/api\/orders\/(\d+)\/accept$/) && request.method === "PATCH") {
+      try {
+        const sql = database(env);
+        const cookies = parseCookies(request);
+        const token = cookies.ordersystem_admin;
+        
+        if (!token) {
+          await sql.end({ timeout: 1 });
+          return Response.json({ error: "需要登录" }, { status: 401 });
+        }
+
+        const [encoded] = token.split(".");
+        const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(
+          atob(encoded.replace(/-/g, "+").replace(/_/g, "/") + "=="), (char) => char.charCodeAt(0),
+        )));
+        
+        if (payload.exp <= Date.now()) {
+          await sql.end({ timeout: 1 });
+          return Response.json({ error: "登录已过期" }, { status: 401 });
+        }
+
+        const orderId = Number(url.pathname.match(/^\/api\/orders\/(\d+)\/accept$/)[1]);
+        const userId = payload.userId;
+
+        const [order] = await sql`
+          update public.orders
+          set delivery_user_id = ${userId}, status = 'accepted', updated_at = now()
+          where id = ${orderId} and (delivery_user_id is null or delivery_user_id = ${userId})
+          returning *
+        `;
+
+        await sql.end({ timeout: 1 });
+        
+        if (!order) {
+          return Response.json({ error: "订单不存在或已被接单" }, { status: 404 });
+        }
+        
+        return Response.json(order);
+      } catch (error) {
+        console.error("Order accept failed", error);
+        return Response.json({ error: "接单失败" }, { status: 503 });
+      }
     }
 
     if (request.method === "POST" && url.pathname === "/orders") {
