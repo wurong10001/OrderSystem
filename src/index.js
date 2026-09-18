@@ -27,9 +27,8 @@ function database(env) {
   return postgres(connectionString, {
     prepare: false,
     max: 1,
-    ssl: "require",
-    connection: { timeout: 5000 },
-    idle_timeout: 5,
+    connection: { timeout: 10000 },
+    idle_timeout: 10,
   });
 }
 
