@@ -22,7 +22,8 @@
         "**/html/*.html",
         "**/css/*.css",
         "**/js/auth.js",
-        "**/js/admin-menu.js"
+        "**/js/admin-menu.js",
+        "**/js/admin-users.js"
       ],
       "fallthrough": false
     }
