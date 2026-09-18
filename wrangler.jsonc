@@ -21,7 +21,8 @@
       "globs": [
         "**/html/*.html",
         "**/css/*.css",
-        "**/js/auth.js"
+        "**/js/auth.js",
+        "**/js/admin-menu.js"
       ],
       "fallthrough": false
     }
