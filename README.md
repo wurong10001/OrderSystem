@@ -23,7 +23,7 @@ curl -X POST http://localhost:8787/orders \
 curl 'http://localhost:8787/orders?instanceId=<instanceId>'
 ```
 
-点单页位于 `/menu`，店名、菜品和价格从数据库动态读取。完整的新版数据库配置、迁移和权限说明见 [`DATABASE_SETUP.md`](DATABASE_SETUP.md)。管理员修改接口需要配置 `ADMIN_SESSION_SECRET`。
+根目录 `/` 是点单菜单，店名、菜品和价格从数据库动态读取；管理员登录页位于 `/admin`。完整的新版数据库配置、迁移和权限说明见 [`DATABASE_SETUP.md`](DATABASE_SETUP.md)。管理员修改接口需要配置 `ADMIN_SESSION_SECRET`。
 
 ## 部署
 

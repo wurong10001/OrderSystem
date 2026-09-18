@@ -310,33 +310,36 @@ export default {
         console.error("Authentication request failed", error);
         return Response.json({ error: "服务暂时不可用，请稍后重试。" }, { status: 503 });
       }
-      if (url.pathname.startsWith("/api/admin/")) {
-        try {
-          return await adminRequest(request, env, url.pathname);
-        } catch (error) {
-          console.error("Admin request failed", error);
-          return Response.json({ error: "服务暂时不可用，请稍后重试。" }, { status: 503 });
-        }
-      }
-      if (request.method === "GET" && url.pathname === "/menu") {
-        try {
-          return await menuPage(env);
-        } catch (error) {
-          console.error("Menu request failed", error);
-          return Response.json({ error: "菜单暂时不可用，请稍后重试。" }, { status: 503 });
-        }
-      }
-      if (request.method === "POST" && url.pathname === "/api/orders") {
-        try {
-          return await createOrder(request, env);
-        } catch (error) {
-          console.error("Order request failed", error);
-          return Response.json({ error: "订单暂时无法提交，请稍后重试。" }, { status: 503 });
-        }
+    }
+
+    if (url.pathname.startsWith("/api/admin/")) {
+      try {
+        return await adminRequest(request, env, url.pathname);
+      } catch (error) {
+        console.error("Admin request failed", error);
+        return Response.json({ error: "服务暂时不可用，请稍后重试。" }, { status: 503 });
       }
     }
 
-    if (request.method === "GET" && url.pathname === "/") {
+    if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/menu")) {
+      try {
+        return await menuPage(env);
+      } catch (error) {
+        console.error("Menu request failed", error);
+        return Response.json({ error: "菜单暂时不可用，请稍后重试。" }, { status: 503 });
+      }
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/orders") {
+      try {
+        return await createOrder(request, env);
+      } catch (error) {
+        console.error("Order request failed", error);
+        return Response.json({ error: "订单暂时无法提交，请稍后重试。" }, { status: 503 });
+      }
+    }
+
+    if (request.method === "GET" && url.pathname === "/admin") {
       return assetResponse(loginHtml, "text/html");
     }
 
