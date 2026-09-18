@@ -102,17 +102,26 @@ async function submitAuth(event) {
       salt = saltResult.salt;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     const response = await fetch(`/api/auth/${page}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, salt, passwordHash: sm3(`${salt}:${password}`) }),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || "请求失败，请稍后重试。");
     setMessage(page === "register" ? "注册成功，即将前往登录页面。" : "登录成功。", "success");
     if (page === "register") setTimeout(() => { window.location.href = "/"; }, 800);
   } catch (error) {
-    setMessage(error.message);
+    if (error.name === "AbortError") {
+      setMessage("请求超时，请检查网络后重试。");
+    } else {
+      setMessage(error.message);
+    }
   } finally {
     submitButton.disabled = false;
     submitButton.textContent = page === "register" ? "注册" : "登录";
