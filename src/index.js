@@ -20,6 +20,30 @@ const IDENTIFIER_PATTERN = /^[\p{L}\p{N}_-]{1,64}$/u;
 const SESSION_COOKIE = "ordersystem_admin";
 const SESSION_MAX_AGE = 86400;
 
+// 运行时生成的 session secret（如果未配置环境变量）
+let _runtimeSecret = null;
+
+function generateSecret() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function getSessionSecret(env) {
+  // 优先使用环境变量
+  if (env.ADMIN_SESSION_SECRET) {
+    return env.ADMIN_SESSION_SECRET;
+  }
+  // 否则使用运行时生成的（注意：Worker 重启后会失效，所有用户需要重新登录）
+  if (!_runtimeSecret) {
+    _runtimeSecret = generateSecret();
+    console.warn('ADMIN_SESSION_SECRET 未配置，使用运行时生成的临时密钥。Worker 重启后所有用户需要重新登录。');
+  }
+  return _runtimeSecret;
+}
+
 function assetResponse(content, contentType) {
   return new Response(content, {
     headers: { "Content-Type": `${contentType}; charset=UTF-8` },
@@ -92,7 +116,7 @@ async function signSession(payload, secret) {
 
 async function readSession(request, env) {
   const token = parseCookies(request)[SESSION_COOKIE];
-  const secret = env.ADMIN_SESSION_SECRET;
+  const secret = getSessionSecret(env);
   if (!token || !secret) return null;
   const [encoded, signature] = token.split(".");
   if (!encoded || !signature) return null;
@@ -137,10 +161,8 @@ async function adminRequest(request, env, pathname) {
       if (!user || body?.passwordHash?.toLowerCase() !== user.password_hash.toLowerCase()) {
         return Response.json({ error: "用户名或密码错误。" }, { status: 401 });
       }
-      if (!env.ADMIN_SESSION_SECRET) {
-        return Response.json({ error: "ADMIN_SESSION_SECRET 未配置。" }, { status: 503 });
-      }
-      const token = await signSession({ username: user.username, permission: user.permission, exp: Date.now() + SESSION_MAX_AGE * 1000 }, env.ADMIN_SESSION_SECRET);
+      const secret = getSessionSecret(env);
+      const token = await signSession({ username: user.username, permission: user.permission, exp: Date.now() + SESSION_MAX_AGE * 1000 }, secret);
       return jsonResponse({ ok: true }, 200, { "Set-Cookie": adminCookie(token) });
     }
 
@@ -435,18 +457,16 @@ async function authRequest(request, env, pathname) {
       if (!user || user.password_hash.toLowerCase() !== body.passwordHash.toLowerCase()) {
         return Response.json({ error: "用户名或密码错误。" }, { status: 401 });
       }
-      if (!env.ADMIN_SESSION_SECRET) {
-        return Response.json({ error: "ADMIN_SESSION_SECRET 未配置。" }, { status: 503 });
-      }
 
       const role = user.role || "user";
+      const secret = getSessionSecret(env);
       const token = await signSession({
         userId: user.id,
         username: user.username,
         role,
         permission: user.permission ?? 0,
         exp: Date.now() + SESSION_MAX_AGE * 1000,
-      }, env.ADMIN_SESSION_SECRET);
+      }, secret);
 
       return jsonResponse({ ok: true, role, username: user.username }, 200, {
         "Set-Cookie": adminCookie(token),
