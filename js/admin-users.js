@@ -19,17 +19,10 @@ function showMessage(text, type = "error") {
 
 async function fetchCurrentUser() {
   try {
-    const response = await fetch("/api/admin/settings");
+    const response = await fetch("/api/auth/me");
     if (!response.ok) throw new Error("未登录");
-    // Extract username from cookie
-    const cookies = document.cookie.split(";").map(c => c.trim());
-    const tokenCookie = cookies.find(c => c.startsWith("ordersystem_admin="));
-    if (!tokenCookie) throw new Error("未登录");
-    
-    const token = tokenCookie.split("=")[1];
-    const [encoded] = decodeURIComponent(token).split(".");
-    const payload = JSON.parse(atob(encoded.replace(/-/g, "+").replace(/_/g, "/") + "=="));
-    return payload.username;
+    const user = await response.json();
+    return user.username;
   } catch (e) {
     window.location.href = "/admin";
     return null;

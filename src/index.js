@@ -15,10 +15,19 @@ import adminOrdersJs from "../js/admin-orders.js";
 
 export { OrderWorkflow };
 
+const USERNAME_PATTERN = /^[\p{L}\p{N}_-]{3,32}$/u;
+const IDENTIFIER_PATTERN = /^[\p{L}\p{N}_-]{1,64}$/u;
+const SESSION_COOKIE = "ordersystem_admin";
+const SESSION_MAX_AGE = 86400;
+
 function assetResponse(content, contentType) {
   return new Response(content, {
     headers: { "Content-Type": `${contentType}; charset=UTF-8` },
   });
+}
+
+function jsonResponse(body, status = 200, headers = {}) {
+  return Response.json(body, { status, headers });
 }
 
 function database(env) {
@@ -48,20 +57,28 @@ function validCredentials(body) {
     typeof body.username === "string" &&
     typeof body.salt === "string" &&
     typeof body.passwordHash === "string" &&
-    /^[\p{L}\p{N}_-]{3,32}$/u.test(body.username) &&
+    USERNAME_PATTERN.test(body.username) &&
     /^[0-9a-f]{32}$/i.test(body.salt) &&
     /^[0-9a-f]{64}$/i.test(body.passwordHash);
 }
 
 function parseCookies(request) {
-  return Object.fromEntries((request.headers.get("Cookie") || "").split(";").filter(Boolean).map((part) => {
-    const index = part.indexOf("=");
-    return [part.slice(0, index).trim(), decodeURIComponent(part.slice(index + 1).trim())];
-  }));
+  return Object.fromEntries((request.headers.get("Cookie") || "")
+    .split(";")
+    .filter(Boolean)
+    .map((part) => {
+      const index = part.indexOf("=");
+      return [part.slice(0, index).trim(), decodeURIComponent(part.slice(index + 1).trim())];
+    }));
 }
 
 function base64Url(value) {
   return btoa(String.fromCharCode(...new Uint8Array(value))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function decodeBase64Url(value) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  return atob(normalized + "=".repeat((4 - normalized.length % 4) % 4));
 }
 
 async function signSession(payload, secret) {
@@ -74,21 +91,21 @@ async function signSession(payload, secret) {
 }
 
 async function readSession(request, env) {
-  const token = parseCookies(request).ordersystem_admin;
+  const token = parseCookies(request)[SESSION_COOKIE];
   const secret = env.ADMIN_SESSION_SECRET;
   if (!token || !secret) return null;
   const [encoded, signature] = token.split(".");
   if (!encoded || !signature) return null;
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
-  const expected = Uint8Array.from(atob(signature.replace(/-/g, "+").replace(/_/g, "/") + "=="), (char) => char.charCodeAt(0));
+  const expected = Uint8Array.from(decodeBase64Url(signature), (char) => char.charCodeAt(0));
   const valid = await crypto.subtle.verify("HMAC", key, expected, new TextEncoder().encode(encoded));
   if (!valid) return null;
   let payload;
   try {
-    payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(
-      atob(encoded.replace(/-/g, "+").replace(/_/g, "/") + "=="), (char) => char.charCodeAt(0),
-    )));
+    payload = JSON.parse(new TextDecoder().decode(
+      Uint8Array.from(decodeBase64Url(encoded), (char) => char.charCodeAt(0)),
+    ));
   } catch {
     return null;
   }
@@ -101,32 +118,8 @@ async function validSession(request, env) {
   return !!payload && payload.permission === 1;
 }
 
-function adminCookie(token, maxAge = 86400) {
-  return `ordersystem_admin=${encodeURIComponent(token)}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=Strict`;
-}
-
-async function menuPage(env) {
-  const sql = database(env);
-  try {
-    const [settings] = await sql`select store_name from public.store_settings where id = 1`;
-    const items = await sql`
-      select id, item_code, name, description, flavors, price
-      from public.menu_items
-      where active = true
-      order by sort_order, id
-    `;
-    const lines = [`${settings?.store_name || "点单菜单"}`, "====================", ""];
-    if (!items.length) lines.push("暂无在售菜品");
-    for (const item of items) {
-      lines.push(`${item.item_code || item.id}. ${item.name}  ¥${Number(item.price).toFixed(2)}`);
-      if (item.description) lines.push(`   ${item.description}`);
-      if (item.flavors?.length) lines.push(`   口味：${item.flavors.join("、")}`);
-    }
-    lines.push("", "提交订单：POST /api/orders");
-    return new Response(lines.join("\n"), { headers: { "Content-Type": "text/plain; charset=UTF-8" } });
-  } finally {
-    await sql.end({ timeout: 1 });
-  }
+function adminCookie(token, maxAge = SESSION_MAX_AGE) {
+  return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=Strict`;
 }
 
 async function adminRequest(request, env, pathname) {
@@ -147,10 +140,8 @@ async function adminRequest(request, env, pathname) {
       if (!env.ADMIN_SESSION_SECRET) {
         return Response.json({ error: "ADMIN_SESSION_SECRET 未配置。" }, { status: 503 });
       }
-      const token = await signSession({ username: user.username, permission: user.permission, exp: Date.now() + 86400000 }, env.ADMIN_SESSION_SECRET);
-      return new Response(JSON.stringify({ ok: true }), {
-        status: 200, headers: { "Content-Type": "application/json", "Set-Cookie": adminCookie(token) },
-      });
+      const token = await signSession({ username: user.username, permission: user.permission, exp: Date.now() + SESSION_MAX_AGE * 1000 }, env.ADMIN_SESSION_SECRET);
+      return jsonResponse({ ok: true }, 200, { "Set-Cookie": adminCookie(token) });
     }
 
     if (pathname === "/api/admin/logout" && request.method === "POST") {
@@ -188,7 +179,7 @@ async function adminRequest(request, env, pathname) {
     if (pathname === "/api/admin/menu" && request.method === "POST") {
       const body = await jsonBody(request);
       if (!body || typeof body.name !== "string" || !body.name.trim() ||
-          typeof body.itemCode !== "string" || !/^[\p{L}\p{N}_-]{1,64}$/u.test(body.itemCode.trim()) ||
+          typeof body.itemCode !== "string" || !IDENTIFIER_PATTERN.test(body.itemCode.trim()) ||
           !Number.isFinite(Number(body.price)) || Number(body.price) < 0 ||
           !Array.isArray(body.flavors) || body.flavors.some((flavor) => typeof flavor !== "string" || !flavor.trim())) {
         return Response.json({ error: "专属 ID、菜品名称、价格或口味选项无效。" }, { status: 400 });
@@ -212,7 +203,7 @@ async function adminRequest(request, env, pathname) {
     if (itemMatch && request.method === "PATCH") {
       const body = await jsonBody(request);
       if (body?.itemCode !== undefined &&
-          (typeof body.itemCode !== "string" || !/^[\p{L}\p{N}_-]{1,64}$/u.test(body.itemCode.trim()))) {
+          (typeof body.itemCode !== "string" || !IDENTIFIER_PATTERN.test(body.itemCode.trim()))) {
         return Response.json({ error: "专属 ID 无效。" }, { status: 400 });
       }
       const [item] = await sql`
@@ -390,7 +381,7 @@ async function authRequest(request, env, pathname) {
   try {
     if (pathname === "/api/auth/salt" && request.method === "GET") {
       const username = new URL(request.url).searchParams.get("username")?.trim();
-      if (!username || !/^[\p{L}\p{N}_-]{3,32}$/u.test(username)) {
+      if (!username || !USERNAME_PATTERN.test(username)) {
         return Response.json({ error: "用户名或密码错误。" }, { status: 400 });
       }
 
@@ -454,12 +445,11 @@ async function authRequest(request, env, pathname) {
         username: user.username,
         role,
         permission: user.permission ?? 0,
-        exp: Date.now() + 86400000,
+        exp: Date.now() + SESSION_MAX_AGE * 1000,
       }, env.ADMIN_SESSION_SECRET);
 
-      return new Response(JSON.stringify({ ok: true, role, username: user.username }), {
-        status: 200,
-        headers: { "Content-Type": "application/json", "Set-Cookie": adminCookie(token) },
+      return jsonResponse({ ok: true, role, username: user.username }, 200, {
+        "Set-Cookie": adminCookie(token),
       });
     }
 
@@ -566,10 +556,6 @@ export default {
 
     if (request.method === "GET" && url.pathname === "/js/admin-orders.js") {
       return assetResponse(adminOrdersJs, "text/javascript");
-    }
-
-    if (request.method === "GET" && url.pathname === "/ordering") {
-      return assetResponse(orderingHtml, "text/html");
     }
 
     if (request.method === "GET" && url.pathname === "/ordering") {
