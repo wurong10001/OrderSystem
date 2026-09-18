@@ -14,13 +14,13 @@
       min-height: 100vh;
     }
     .header {
-      background: linear-gradient(135deg, #ffd600 0%, #ffab00 100%);
+      background: #fff;
       padding: 20px 16px;
       text-align: center;
       position: sticky;
       top: 0;
       z-index: 100;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
     .header h1 { font-size: 22px; color: #333; font-weight: 700; }
     .header p { font-size: 13px; color: #666; margin-top: 4px; }
@@ -43,8 +43,8 @@
       transition: all 0.2s;
     }
     .category-tab.active {
-      background: #ffd600;
-      color: #333;
+      background: #333;
+      color: #fff;
       font-weight: 600;
     }
     
@@ -104,16 +104,17 @@
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      background: #ffd600;
+      background: #333;
       border: none;
       font-size: 20px;
+      color: #fff;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
     }
-    .add-btn:active { background: #ffab00; }
+    .add-btn:active { background: #111; }
     
     /* SECTION: modal */
     .modal-overlay {
@@ -220,8 +221,8 @@
       border: 2px solid transparent;
     }
     .option-item.selected {
-      background: #fff8e1;
-      border-color: #ffd600;
+      background: #f0f0f0;
+      border-color: #333;
       color: #333;
       font-weight: 500;
     }
@@ -263,15 +264,16 @@
     
     .add-to-cart-btn {
       padding: 14px 32px;
-      background: #ffd600;
+      background: #333;
+      color: #fff;
       border: none;
       border-radius: 24px;
       font-size: 16px;
       font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 2px 8px rgba(255,214,0,0.4);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
-    .add-to-cart-btn:active { background: #ffab00; }
+    .add-to-cart-btn:active { background: #111; }
     
     /* SECTION: cart-bar */
     .cart-bar {
@@ -307,16 +309,16 @@
     .cart-total { font-size: 18px; font-weight: 600; }
     .checkout-btn {
       padding: 12px 24px;
-      background: #ffd600;
-      color: #333;
+      background: #333;
+      color: #fff;
       border: none;
       border-radius: 24px;
       font-size: 16px;
       font-weight: 600;
       cursor: pointer;
     }
-    .checkout-btn:disabled { background: #666; color: #999; cursor: not-allowed; }
-    .checkout-btn:active:not(:disabled) { background: #ffab00; }
+    .checkout-btn:disabled { background: #ccc; cursor: not-allowed; }
+    .checkout-btn:active:not(:disabled) { background: #111; }
     
     .empty-state {
       text-align: center;
