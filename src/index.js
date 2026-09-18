@@ -2,8 +2,10 @@ import { OrderWorkflow } from "./workflow";
 import postgres from "postgres";
 import loginHtml from "../html/login.html";
 import registerHtml from "../html/register.html";
+import adminMenuHtml from "../html/admin-menu.html";
 import authCss from "../css/auth.css";
 import authJs from "../js/auth.js";
+import adminMenuJs from "../js/admin-menu.js";
 
 export { OrderWorkflow };
 
@@ -21,6 +23,7 @@ function database(env) {
   return postgres(connectionString, {
     prepare: false,
     max: 1,
+    ssl: "require",
     connection: { timeout: 5000 },
     idle_timeout: 5,
   });
@@ -90,7 +93,7 @@ async function menuPage(env) {
   try {
     const [settings] = await sql`select store_name from public.store_settings where id = 1`;
     const items = await sql`
-      select id, name, description, price
+      select id, item_code, name, description, flavors, price
       from public.menu_items
       where active = true
       order by sort_order, id
@@ -98,8 +101,9 @@ async function menuPage(env) {
     const lines = [`${settings?.store_name || "点单菜单"}`, "====================", ""];
     if (!items.length) lines.push("暂无在售菜品");
     for (const item of items) {
-      lines.push(`${item.id}. ${item.name}  ¥${Number(item.price).toFixed(2)}`);
+      lines.push(`${item.item_code || item.id}. ${item.name}  ¥${Number(item.price).toFixed(2)}`);
       if (item.description) lines.push(`   ${item.description}`);
+      if (item.flavors?.length) lines.push(`   口味：${item.flavors.join("、")}`);
     }
     lines.push("", "提交订单：POST /api/orders");
     return new Response(lines.join("\n"), { headers: { "Content-Type": "text/plain; charset=UTF-8" } });
@@ -142,6 +146,11 @@ async function adminRequest(request, env, pathname) {
       return Response.json({ error: "需要管理员登录。" }, { status: 401 });
     }
 
+    if (pathname === "/api/admin/settings" && request.method === "GET") {
+      const [settings] = await sql`select store_name from public.store_settings where id = 1`;
+      return Response.json(settings || { store_name: "" });
+    }
+
     if (pathname === "/api/admin/settings" && request.method === "PUT") {
       const body = await jsonBody(request);
       if (!body || typeof body.storeName !== "string" || !body.storeName.trim()) {
@@ -161,24 +170,40 @@ async function adminRequest(request, env, pathname) {
 
     if (pathname === "/api/admin/menu" && request.method === "POST") {
       const body = await jsonBody(request);
-      if (!body || typeof body.name !== "string" || !Number.isFinite(Number(body.price)) || Number(body.price) < 0) {
-        return Response.json({ error: "菜品名称和价格无效。" }, { status: 400 });
+      if (!body || typeof body.name !== "string" || !body.name.trim() ||
+          typeof body.itemCode !== "string" || !/^[\p{L}\p{N}_-]{1,64}$/u.test(body.itemCode.trim()) ||
+          !Number.isFinite(Number(body.price)) || Number(body.price) < 0 ||
+          !Array.isArray(body.flavors) || body.flavors.some((flavor) => typeof flavor !== "string" || !flavor.trim())) {
+        return Response.json({ error: "专属 ID、菜品名称、价格或口味选项无效。" }, { status: 400 });
       }
-      const [item] = await sql`
-        insert into public.menu_items (name, description, price, sort_order, active)
-        values (${body.name.trim()}, ${body.description || null}, ${Number(body.price)}, ${Number(body.sortOrder) || 0}, ${body.active !== false})
-        returning *
-      `;
-      return Response.json(item, { status: 201 });
+      try {
+        const [item] = await sql`
+          insert into public.menu_items (item_code, name, description, flavors, price, sort_order, active)
+          values (${body.itemCode.trim()}, ${body.name.trim()}, ${body.description?.trim() || null},
+            ${body.flavors.map((flavor) => flavor.trim())}, ${Number(body.price)},
+            ${Number(body.sortOrder) || 0}, ${body.active !== false})
+          returning *
+        `;
+        return Response.json(item, { status: 201 });
+      } catch (error) {
+        if (error?.code === "23505") return Response.json({ error: "专属 ID 已存在。" }, { status: 409 });
+        throw error;
+      }
     }
 
     const itemMatch = pathname.match(/^\/api\/admin\/menu\/(\d+)$/);
     if (itemMatch && request.method === "PATCH") {
       const body = await jsonBody(request);
+      if (body?.itemCode !== undefined &&
+          (typeof body.itemCode !== "string" || !/^[\p{L}\p{N}_-]{1,64}$/u.test(body.itemCode.trim()))) {
+        return Response.json({ error: "专属 ID 无效。" }, { status: 400 });
+      }
       const [item] = await sql`
         update public.menu_items
-        set name = coalesce(${body?.name?.trim() || null}, name),
+        set item_code = coalesce(${body?.itemCode?.trim() || null}, item_code),
+            name = coalesce(${body?.name?.trim() || null}, name),
             description = coalesce(${body?.description ?? null}, description),
+            flavors = coalesce(${Array.isArray(body?.flavors) ? body.flavors.map((flavor) => String(flavor).trim()).filter(Boolean) : null}, flavors),
             price = coalesce(${Number.isFinite(Number(body?.price)) ? Number(body.price) : null}, price),
             sort_order = coalesce(${Number.isFinite(Number(body?.sortOrder)) ? Number(body.sortOrder) : null}, sort_order),
             active = coalesce(${typeof body?.active === "boolean" ? body.active : null}, active),
@@ -343,6 +368,11 @@ export default {
       return assetResponse(loginHtml, "text/html");
     }
 
+    if (request.method === "GET" && url.pathname === "/admin/menu") {
+      if (!await validSession(request, env)) return Response.redirect(new URL("/admin", request.url), 302);
+      return assetResponse(adminMenuHtml, "text/html");
+    }
+
     if (request.method === "GET" && url.pathname === "/register") {
       return assetResponse(registerHtml, "text/html");
     }
@@ -353,6 +383,10 @@ export default {
 
     if (request.method === "GET" && url.pathname === "/js/auth.js") {
       return assetResponse(authJs, "text/javascript");
+    }
+
+    if (request.method === "GET" && url.pathname === "/js/admin-menu.js") {
+      return assetResponse(adminMenuJs, "text/javascript");
     }
 
     if (request.method === "POST" && url.pathname === "/orders") {
