@@ -1,6 +1,35 @@
 # OrderSystem
 
-这是一个基于 Cloudflare Workers Workflows 的订单处理模板。Workflow 会依次校验订单、预留订单、等待下游系统稳定并发送确认通知；每个步骤都能持久化状态，并可配置自动重试。
+基于 Cloudflare Workers 的在线点单系统，支持菜品管理、购物车、订单处理、多角色权限（管理员/外卖员/用户）。
+
+## 项目结构
+
+```
+├── src/                  # 后端代码
+│   ├── index.js         # 主入口，路由和 API
+│   └── workflow.js      # 订单工作流
+├── html/                # 前端页面
+│   ├── home.html        # 点单主页
+│   ├── ordering.html    # 确认订单页
+│   ├── login.html       # 登录页
+│   ├── register.html    # 注册页
+│   ├── admin-menu.html  # 管理员-菜品管理
+│   ├── admin-orders.html # 管理员/外卖员-订单管理
+│   └── admin-users.html # 管理员-用户管理
+├── css/                 # 样式文件
+│   └── auth.css         # 登录/注册页样式
+├── js/                  # 前端脚本
+│   ├── auth.js          # 登录/注册逻辑
+│   ├── admin-menu.js    # 菜品管理逻辑
+│   ├── admin-orders.js  # 订单管理逻辑
+│   └── admin-users.js   # 用户管理逻辑
+├── docs/                # 文档
+│   ├── DATABASE_SETUP.md       # 数据库配置
+│   ├── ORDER_MENU_SCHEMA.md    # 菜单数据模型
+│   └── SUPABASE_AUTH_SCHEMA.md # 认证表结构
+├── package.json
+└── wrangler.jsonc       # Cloudflare Workers 配置
+```
 
 ## 本地运行
 
@@ -23,7 +52,24 @@ curl -X POST http://localhost:8787/orders \
 curl 'http://localhost:8787/orders?instanceId=<instanceId>'
 ```
 
-根目录 `/` 是点单菜单，店名、菜品和价格从数据库动态读取；管理员登录页位于 `/admin`。完整的新版数据库配置、迁移和权限说明见 [`DATABASE_SETUP.md`](DATABASE_SETUP.md)。管理员修改接口需要配置 `ADMIN_SESSION_SECRET`。
+## 路由说明
+
+| 路径 | 说明 |
+|------|------|
+| `/` | 点单主页 |
+| `/ordering` | 确认订单页 |
+| `/admin` | 管理员登录页 |
+| `/admin/menu` | 菜品管理（需管理员权限） |
+| `/admin/orders` | 订单管理（管理员/外卖员） |
+| `/admin/users` | 用户管理（需管理员权限） |
+| `/register` | 注册页 |
+
+## 环境变量
+
+| 变量 | 必填 | 说明 |
+|------|------|------|
+| `DATABASE_URL_DIRECT` | ✅ | PostgreSQL 连接字符串 |
+| `ADMIN_SESSION_SECRET` | ❌ | Session 签名密钥，未配置时自动生成（Worker 重启后用户需重新登录） |
 
 ## 部署
 
@@ -31,13 +77,13 @@ curl 'http://localhost:8787/orders?instanceId=<instanceId>'
 npm run deploy
 ```
 
-生产环境通过 `DATABASE_URL_DIRECT` 直连 Supabase，数据库连接字符串不要写入 `wrangler.jsonc` 或提交到 Git。部署时使用 Wrangler Secret 配置：
+生产环境通过 `DATABASE_URL_DIRECT` 直连数据库，连接字符串不要写入代码或提交到 Git。使用 Wrangler Secret 配置：
 
 ```bash
 printf '%s' 'postgresql://<user>:<password>@<host>:6543/postgres' | npx wrangler secret put DATABASE_URL_DIRECT
 ```
 
-本地运行 `wrangler dev` 时，在未提交的 `.dev.vars` 中提供本地数据库连接串：
+本地开发时，在 `.dev.vars` 中配置：
 
 ```bash
 cat > .dev.vars <<'EOF'
@@ -45,12 +91,8 @@ DATABASE_URL_DIRECT=postgresql://<user>:<password>@<host>:6543/postgres
 EOF
 ```
 
-应用通过 `env.DATABASE_URL_DIRECT` 获取连接串；本地开发时可使用 `.dev.vars` 中的连接串：
+## 文档
 
-```text
-DATABASE_URL_DIRECT=postgresql://<user>:<password>@<host>:6543/postgres
-```
-
-如果数据库密码曾经被公开，请先在 Supabase 控制台轮换密码，再更新 `DATABASE_URL_DIRECT` Secret。
-
-将 `src/workflow.js` 中的示例步骤替换为真实的支付、库存和通知服务调用。生产环境中建议通过 Wrangler secrets 配置 API 凭据，不要把密钥写入代码或 `wrangler.jsonc`。
+- [数据库配置](docs/DATABASE_SETUP.md)
+- [菜单数据模型](docs/ORDER_MENU_SCHEMA.md)
+- [认证表结构](docs/SUPABASE_AUTH_SCHEMA.md)

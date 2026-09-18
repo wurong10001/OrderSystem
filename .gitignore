@@ -1,6 +1,32 @@
+# Dependencies
+node_modules/
+
+# Wrangler / Cloudflare
+.wrangler/
 .dev.vars
+
+# Environment
 .env
 .env.*
 !.env.example
-node_modules/
-.wrangler/
+
+# AI workspace files (not part of project)
+.openclaw/
+.skill-creator-sync/
+memory/
+html-gen/
+prototype-html/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backup files
+*.bak
+*.backup
