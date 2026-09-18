@@ -20,9 +20,9 @@ function assetResponse(content, contentType) {
 }
 
 function database(env) {
-  const connectionString = env.DATABASE_URL_DIRECT || env.DATABASE_URL?.connectionString;
+  const connectionString = env.DATABASE_URL;
   if (!connectionString) {
-    throw new Error("Database connection not configured");
+    throw new Error("DATABASE_URL secret is not configured");
   }
   return postgres(connectionString, {
     prepare: false,
