@@ -14,11 +14,16 @@ function assetResponse(content, contentType) {
 }
 
 function database(env) {
-  const connectionString = env.DATABASE_URL?.connectionString;
+  const connectionString = env.DATABASE_URL_DIRECT || env.DATABASE_URL?.connectionString;
   if (!connectionString) {
-    throw new Error("DATABASE_URL Hyperdrive binding is not configured");
+    throw new Error("Database connection not configured");
   }
-  return postgres(connectionString, { prepare: false, max: 1 });
+  return postgres(connectionString, {
+    prepare: false,
+    max: 1,
+    connection: { timeout: 5000 },
+    idle_timeout: 5,
+  });
 }
 
 async function jsonBody(request) {
