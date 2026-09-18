@@ -4,9 +4,11 @@ import loginHtml from "../html/login.html";
 import registerHtml from "../html/register.html";
 import adminMenuHtml from "../html/admin-menu.html";
 import orderingHtml from "../html/ordering.html";
+import adminUsersHtml from "../html/admin-users.html";
 import authCss from "../css/auth.css";
 import authJs from "../js/auth.js";
 import adminMenuJs from "../js/admin-menu.js";
+import adminUsersJs from "../js/admin-users.js";
 
 export { OrderWorkflow };
 
@@ -219,6 +221,56 @@ async function adminRequest(request, env, pathname) {
       await sql`delete from public.menu_items where id = ${Number(itemMatch[1])}`;
       return Response.json({ ok: true });
     }
+
+    // User management APIs
+    if (pathname === "/api/admin/users" && request.method === "GET") {
+      const users = await sql`
+        select id, username, role, permission
+        from public.app_users
+        order by created_at desc
+      `;
+      return Response.json(users);
+    }
+
+    const userMatch = pathname.match(/^\/api\/admin\/users\/([a-f0-9-]+)$/);
+    if (userMatch && request.method === "PATCH") {
+      const body = await jsonBody(request);
+      const targetUserId = userMatch[1];
+      
+      // Get current user from session
+      const token = parseCookies(request).ordersystem_admin;
+      const [encoded] = token.split(".");
+      const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(
+        atob(encoded.replace(/-/g, "+").replace(/_/g, "/") + "=="), (char) => char.charCodeAt(0),
+      )));
+      
+      // Prevent modifying own permissions
+      const [currentUser] = await sql`
+        select id from public.app_users where username_normalized = ${payload.username.toLowerCase()}
+      `;
+      
+      if (currentUser && currentUser.id === targetUserId) {
+        return Response.json({ error: "不能修改自己的权限" }, { status: 403 });
+      }
+
+      // Validate role
+      const validRoles = ["user", "delivery", "admin"];
+      if (!body || !validRoles.includes(body.role)) {
+        return Response.json({ error: "无效的角色" }, { status: 400 });
+      }
+
+      const permission = body.role === "admin" ? 1 : 0;
+      
+      const [user] = await sql`
+        update public.app_users
+        set role = ${body.role}, permission = ${permission}, updated_at = now()
+        where id = ${targetUserId}
+        returning id, username, role, permission
+      `;
+      
+      return user ? Response.json(user) : Response.json({ error: "用户不存在" }, { status: 404 });
+    }
+
     return Response.json({ error: "Not found" }, { status: 404 });
   } finally {
     await sql.end({ timeout: 1 });
@@ -374,6 +426,11 @@ export default {
       return assetResponse(adminMenuHtml, "text/html");
     }
 
+    if (request.method === "GET" && url.pathname === "/admin/users") {
+      if (!await validSession(request, env)) return Response.redirect(new URL("/admin", request.url), 302);
+      return assetResponse(adminUsersHtml, "text/html");
+    }
+
     if (request.method === "GET" && url.pathname === "/register") {
       return assetResponse(registerHtml, "text/html");
     }
@@ -388,6 +445,10 @@ export default {
 
     if (request.method === "GET" && url.pathname === "/js/admin-menu.js") {
       return assetResponse(adminMenuJs, "text/javascript");
+    }
+
+    if (request.method === "GET" && url.pathname === "/js/admin-users.js") {
+      return assetResponse(adminUsersJs, "text/javascript");
     }
 
     if (request.method === "GET" && url.pathname === "/ordering") {
