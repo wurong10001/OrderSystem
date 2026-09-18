@@ -1,5 +1,6 @@
 import { OrderWorkflow } from "./workflow";
 import postgres from "postgres";
+import homeHtml from "../html/home.html";
 import loginHtml from "../html/login.html";
 import registerHtml from "../html/register.html";
 import adminMenuHtml from "../html/admin-menu.html";
@@ -222,6 +223,68 @@ async function adminRequest(request, env, pathname) {
       return Response.json({ ok: true });
     }
 
+    // Menu item attributes API
+    if (pathname === "/api/admin/menu/attributes" && request.method === "GET") {
+      const menuItemId = new URL(request.url).searchParams.get("menuItemId");
+      if (!menuItemId) {
+        return Response.json({ error: "缺少菜品ID" }, { status: 400 });
+      }
+      const attributes = await sql`
+        select a.*, 
+          coalesce(
+            json_agg(
+              json_build_object('id', o.id, 'value', o.value, 'priceAdjustment', o.price_adjustment, 'sortOrder', o.sort_order)
+              order by o.sort_order
+            ) filter (where o.id is not null), '[]'
+          ) as options
+        from public.menu_item_attributes a
+        left join public.menu_item_attribute_options o on o.attribute_id = a.id
+        where a.menu_item_id = ${Number(menuItemId)}
+        group by a.id, a.name, a.required, a.sort_order, a.menu_item_id, a.created_at
+        order by a.sort_order
+      `;
+      return Response.json(attributes);
+    }
+
+    if (pathname === "/api/admin/menu/attributes" && request.method === "POST") {
+      const body = await jsonBody(request);
+      if (!body || !body.menuItemId || !body.name?.trim()) {
+        return Response.json({ error: "缺少必要参数" }, { status: 400 });
+      }
+      const [attr] = await sql`
+        insert into public.menu_item_attributes (menu_item_id, name, required, sort_order)
+        values (${Number(body.menuItemId)}, ${body.name.trim()}, ${body.required || false}, ${Number(body.sortOrder) || 0})
+        returning *
+      `;
+      return Response.json(attr, { status: 201 });
+    }
+
+    const attrMatch = pathname.match(/^\/api\/admin\/menu\/attributes\/(\d+)$/);
+    if (attrMatch && request.method === "DELETE") {
+      await sql`delete from public.menu_item_attributes where id = ${Number(attrMatch[1])}`;
+      return Response.json({ ok: true });
+    }
+
+    // Menu item attribute options API
+    if (pathname === "/api/admin/menu/attribute-options" && request.method === "POST") {
+      const body = await jsonBody(request);
+      if (!body || !body.attributeId || !body.value?.trim()) {
+        return Response.json({ error: "缺少必要参数" }, { status: 400 });
+      }
+      const [option] = await sql`
+        insert into public.menu_item_attribute_options (attribute_id, value, price_adjustment, sort_order)
+        values (${Number(body.attributeId)}, ${body.value.trim()}, ${Number(body.priceAdjustment) || 0}, ${Number(body.sortOrder) || 0})
+        returning *
+      `;
+      return Response.json(option, { status: 201 });
+    }
+
+    const optionMatch = pathname.match(/^\/api\/admin\/menu\/attribute-options\/(\d+)$/);
+    if (optionMatch && request.method === "DELETE") {
+      await sql`delete from public.menu_item_attribute_options where id = ${Number(optionMatch[1])}`;
+      return Response.json({ ok: true });
+    }
+
     // User management APIs
     if (pathname === "/api/admin/users" && request.method === "GET") {
       const users = await sql`
@@ -294,7 +357,9 @@ async function createOrder(request, env) {
     const total = orderItems.reduce((sum, item) => sum + Number(item.menu.price) * item.quantity, 0);
     const [order] = await sql.begin(async (tx) => {
       const [created] = await tx`
-        insert into public.orders (customer_name, total_amount) values (${body.customerName || null}, ${total}) returning id
+        insert into public.orders (customer_name, total_amount, status) 
+        values (${body.customerName || null}, ${total}, 'pending') 
+        returning id
       `;
       for (const item of orderItems) {
         await tx`insert into public.order_items (order_id, menu_item_id, item_name, unit_price, quantity)
@@ -399,13 +464,12 @@ export default {
       }
     }
 
-    if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/menu")) {
-      try {
-        return await menuPage(env);
-      } catch (error) {
-        console.error("Menu request failed", error);
-        return Response.json({ error: "菜单暂时不可用，请稍后重试。" }, { status: 503 });
-      }
+    if (request.method === "GET" && url.pathname === "/") {
+      return assetResponse(homeHtml, "text/html");
+    }
+
+    if (request.method === "GET" && (url.pathname === "/menu" || url.pathname === "/ordering")) {
+      return assetResponse(orderingHtml, "text/html");
     }
 
     if (request.method === "POST" && url.pathname === "/api/orders") {
@@ -455,17 +519,57 @@ export default {
       return assetResponse(orderingHtml, "text/html");
     }
 
+    if (request.method === "GET" && url.pathname === "/ordering") {
+      return assetResponse(orderingHtml, "text/html");
+    }
+
     if (request.method === "GET" && url.pathname === "/api/menu/items") {
       try {
         const sql = database(env);
         const items = await sql`
-          select id, item_code, name, description, flavors, price
+          select id, name, description, price, image_url, sort_order
           from public.menu_items
           where active = true
           order by sort_order, id
         `;
+        
+        // Fetch attributes for all items
+        const itemIds = items.map(i => i.id);
+        const attributes = itemIds.length > 0 ? await sql`
+          select a.id, a.menu_item_id, a.name, a.required, a.sort_order,
+            coalesce(
+              json_agg(
+                json_build_object('id', o.id, 'value', o.value, 'priceAdjustment', o.price_adjustment, 'sortOrder', o.sort_order)
+                order by o.sort_order
+              ) filter (where o.id is not null), '[]'
+            ) as options
+          from public.menu_item_attributes a
+          left join public.menu_item_attribute_options o on o.attribute_id = a.id
+          where a.menu_item_id = any(${itemIds})
+          group by a.id, a.menu_item_id, a.name, a.required, a.sort_order
+          order by a.sort_order
+        ` : [];
+        
         await sql.end({ timeout: 1 });
-        return Response.json(items);
+        
+        // Group attributes by menu_item_id
+        const attrsByItem = {};
+        for (const attr of attributes) {
+          if (!attrsByItem[attr.menu_item_id]) attrsByItem[attr.menu_item_id] = [];
+          attrsByItem[attr.menu_item_id].push({
+            id: attr.id,
+            name: attr.name,
+            required: attr.required,
+            options: attr.options
+          });
+        }
+        
+        const result = items.map(item => ({
+          ...item,
+          attributes: attrsByItem[item.id] || []
+        }));
+        
+        return Response.json(result);
       } catch (error) {
         console.error("Menu items fetch failed", error);
         return Response.json({ error: "菜单暂时不可用" }, { status: 503 });

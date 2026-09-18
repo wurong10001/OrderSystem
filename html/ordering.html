@@ -3,180 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>点单菜单</title>
+  <title>确认订单</title>
   <style>
-    /* SECTION: styles */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: #f5f5f5;
       color: #333;
       min-height: 100vh;
-      padding-bottom: 80px;
+      padding-bottom: 100px;
     }
     .header {
-      background: #fff;
-      padding: 16px;
+      background: linear-gradient(135deg, #ffd600 0%, #ffab00 100%);
+      padding: 20px 16px;
       text-align: center;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      position: sticky;
-      top: 0;
-      z-index: 100;
     }
     .header h1 { font-size: 20px; color: #333; }
-    .menu-container {
+    .container {
       max-width: 600px;
       margin: 0 auto;
       padding: 16px;
     }
-    .menu-item {
+    .cart-section {
       background: #fff;
       border-radius: 12px;
       padding: 16px;
-      margin-bottom: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      margin-bottom: 16px;
     }
-    .menu-item-info { flex: 1; }
-    .menu-item-name { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
-    .menu-item-desc { font-size: 13px; color: #666; margin-bottom: 8px; }
-    .menu-item-price { font-size: 18px; color: #e74c3c; font-weight: 600; }
-    .menu-item-actions { display: flex; align-items: center; gap: 8px; }
-    .qty-btn {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      border: none;
-      background: #f0f0f0;
-      font-size: 18px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .qty-btn:active { background: #e0e0e0; }
-    .qty-display { min-width: 24px; text-align: center; font-weight: 600; }
-    .add-btn {
-      padding: 8px 16px;
-      background: #e74c3c;
-      color: #fff;
-      border: none;
-      border-radius: 20px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    .add-btn:active { background: #c0392b; }
-
-    /* SECTION: cart-bar */
-    .cart-bar {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: #333;
-      color: #fff;
-      padding: 12px 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      z-index: 200;
-    }
-    .cart-info { display: flex; align-items: center; gap: 12px; }
-    .cart-icon {
-      position: relative;
-      font-size: 24px;
-    }
-    .cart-badge {
-      position: absolute;
-      top: -8px;
-      right: -8px;
-      background: #e74c3c;
-      color: #fff;
-      font-size: 12px;
-      min-width: 18px;
-      height: 18px;
-      border-radius: 9px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0 4px;
-    }
-    .cart-total { font-size: 18px; font-weight: 600; }
-    .checkout-btn {
-      padding: 12px 24px;
-      background: #e74c3c;
-      color: #fff;
-      border: none;
-      border-radius: 24px;
+    .section-title {
       font-size: 16px;
       font-weight: 600;
-      cursor: pointer;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #eee;
     }
-    .checkout-btn:disabled { background: #666; cursor: not-allowed; }
-    .checkout-btn:active:not(:disabled) { background: #c0392b; }
-
-    /* SECTION: modal */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 300;
-      padding: 16px;
-    }
-    .modal-overlay[hidden] { display: none; }
-    .modal {
-      background: #fff;
-      border-radius: 16px;
-      width: 100%;
-      max-width: 400px;
-      max-height: 80vh;
-      overflow-y: auto;
-      padding: 24px;
-    }
-    .modal h2 { font-size: 18px; margin-bottom: 16px; }
     .cart-item {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       padding: 12px 0;
-      border-bottom: 1px solid #eee;
+      border-bottom: 1px solid #f0f0f0;
     }
-    .cart-item-name { font-weight: 500; }
-    .cart-item-detail { font-size: 13px; color: #666; }
-    .cart-item-price { color: #e74c3c; font-weight: 600; }
-    .cart-summary {
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 2px solid #333;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    .cart-item:last-child { border-bottom: none; }
+    .cart-item-info { flex: 1; }
+    .cart-item-name { font-weight: 500; margin-bottom: 4px; }
+    .cart-item-options { font-size: 12px; color: #666; margin-top: 4px; }
+    .cart-item-qty { font-size: 13px; color: #999; margin-top: 4px; }
+    .cart-item-price { color: #ff4d4f; font-weight: 600; text-align: right; }
+    
+    .empty-cart {
+      text-align: center;
+      padding: 40px 20px;
+      color: #999;
     }
-    .cart-summary-total { font-size: 20px; font-weight: 700; color: #e74c3c; }
-    .modal-actions {
-      margin-top: 20px;
-      display: flex;
-      gap: 12px;
-    }
-    .modal-actions button {
-      flex: 1;
-      padding: 14px;
-      border-radius: 12px;
-      border: none;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn-cancel { background: #f0f0f0; color: #333; }
-    .btn-confirm { background: #e74c3c; color: #fff; }
-    .btn-confirm:disabled { background: #ccc; }
-
-    /* SECTION: customer-form */
+    .empty-cart-icon { font-size: 48px; margin-bottom: 12px; }
+    
     .form-group { margin-bottom: 16px; }
     .form-group label { display: block; font-size: 14px; margin-bottom: 6px; color: #666; }
     .form-group input {
@@ -186,8 +68,39 @@
       border-radius: 8px;
       font-size: 16px;
     }
-
-    /* SECTION: toast */
+    
+    .summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 0;
+      font-size: 18px;
+    }
+    .summary-total { font-size: 24px; font-weight: 700; color: #ff4d4f; }
+    
+    .submit-btn {
+      width: 100%;
+      padding: 16px;
+      background: #ffd600;
+      color: #333;
+      border: none;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+    .submit-btn:disabled { background: #ccc; color: #999; }
+    .submit-btn:active:not(:disabled) { background: #ffab00; }
+    
+    .back-link {
+      display: inline-block;
+      margin-bottom: 16px;
+      color: #667eea;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    
     .toast {
       position: fixed;
       top: 80px;
@@ -204,75 +117,64 @@
       0%, 100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
       10%, 90% { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
-
-    /* SECTION: responsive */
-    @media (max-width: 400px) {
-      .menu-item { padding: 12px; }
-      .menu-item-name { font-size: 15px; }
-      .menu-item-price { font-size: 16px; }
-    }
   </style>
 </head>
 <body>
-  <!-- SECTION: header -->
   <header class="header">
-    <h1 id="store-name">点单菜单</h1>
+    <h1>确认订单</h1>
   </header>
 
-  <!-- SECTION: menu-list -->
-  <main class="menu-container" id="menu-list">
-    <p style="text-align:center;color:#999;padding:40px 0;">加载中...</p>
-  </main>
-
-  <!-- SECTION: cart-bar -->
-  <div class="cart-bar">
-    <div class="cart-info">
-      <span class="cart-icon">
-        🛒
-        <span class="cart-badge" id="cart-badge" hidden>0</span>
-      </span>
-      <span class="cart-total" id="cart-total">¥0.00</span>
-    </div>
-    <button class="checkout-btn" id="checkout-btn" disabled data-primary-action>去结算</button>
-  </div>
-
-  <!-- SECTION: checkout-modal -->
-  <div class="modal-overlay" id="checkout-modal" hidden>
-    <div class="modal">
-      <h2>确认订单</h2>
-      <div id="cart-items"></div>
-      <div class="cart-summary">
-        <span>合计</span>
-        <span class="cart-summary-total" id="modal-total">¥0.00</span>
+  <div class="container">
+    <a href="/" class="back-link">← 返回菜单</a>
+    
+    <div class="cart-section">
+      <div class="section-title">已选菜品</div>
+      <div id="cart-items">
+        <div class="empty-cart">
+          <div class="empty-cart-icon">🛒</div>
+          <p>购物车是空的</p>
+        </div>
       </div>
-      <div class="form-group" style="margin-top:16px;">
+    </div>
+
+    <div class="cart-section">
+      <div class="section-title">订单信息</div>
+      <div class="form-group">
         <label for="customer-name">称呼（选填）</label>
         <input type="text" id="customer-name" placeholder="您的称呼">
       </div>
-      <div class="modal-actions">
-        <button class="btn-cancel" id="cancel-checkout">取消</button>
-        <button class="btn-confirm" id="confirm-order" data-primary-action>提交订单</button>
+      <div class="form-group">
+        <label for="customer-phone">手机号（选填）</label>
+        <input type="tel" id="customer-phone" placeholder="方便联系您">
       </div>
+      <div class="form-group">
+        <label for="customer-note">备注（选填）</label>
+        <input type="text" id="customer-note" placeholder="如：少放辣、多加葱等">
+      </div>
+    </div>
+
+    <div class="cart-section">
+      <div class="summary">
+        <span>合计</span>
+        <span class="summary-total" id="total-price">¥0</span>
+      </div>
+      <button class="submit-btn" id="submit-btn" disabled data-primary-action>提交订单</button>
     </div>
   </div>
 
   <script>
-    /* SECTION: state */
-    let menuItems = [];
     let cart = {};
+    let menuItems = [];
 
-    /* SECTION: cookie-helpers */
-    function setCookie(name, value, days = 1) {
-      const expires = new Date(Date.now() + days * 864e5).toUTCString();
-      document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Strict`;
-    }
+    // Cookie helpers
     function getCookie(name) {
       const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
       return match ? decodeURIComponent(match[1]) : null;
     }
-    function saveCart() {
-      setCookie('cart', JSON.stringify(cart), 7);
+    function deleteCookie(name) {
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
     }
+
     function loadCart() {
       try {
         const saved = getCookie('cart');
@@ -280,34 +182,50 @@
       } catch (e) { cart = {}; }
     }
 
-    /* SECTION: render-menu */
-    function renderMenu() {
-      const container = document.getElementById('menu-list');
-      if (!menuItems.length) {
-        container.innerHTML = '<p style="text-align:center;color:#999;padding:40px 0;">暂无菜品</p>';
+    async function fetchMenu() {
+      try {
+        const response = await fetch('/api/menu/items');
+        if (response.ok) {
+          menuItems = await response.json();
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    function renderCart() {
+      const container = document.getElementById('cart-items');
+      const items = Object.values(cart);
+      
+      if (!items.length) {
+        container.innerHTML = `
+          <div class="empty-cart">
+            <div class="empty-cart-icon">🛒</div>
+            <p>购物车是空的</p>
+          </div>
+        `;
+        document.getElementById('submit-btn').disabled = true;
+        document.getElementById('total-price').textContent = '¥0';
         return;
       }
-      container.innerHTML = menuItems.map(item => {
-        const qty = cart[item.id] || 0;
+      
+      container.innerHTML = items.map(item => {
+        const optionText = Object.entries(item.optionNames || {})
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(', ');
         return `
-          <div class="menu-item" data-id="${item.id}">
-            <div class="menu-item-info">
-              <div class="menu-item-name">${escapeHtml(item.name)}</div>
-              ${item.description ? `<div class="menu-item-desc">${escapeHtml(item.description)}</div>` : ''}
-              <div class="menu-item-price">¥${Number(item.price).toFixed(2)}</div>
+          <div class="cart-item">
+            <div class="cart-item-info">
+              <div class="cart-item-name">${escapeHtml(item.name)}</div>
+              ${optionText ? `<div class="cart-item-options">${escapeHtml(optionText)}</div>` : ''}
+              <div class="cart-item-qty">x${item.quantity}</div>
             </div>
-            <div class="menu-item-actions">
-              ${qty > 0 ? `
-                <button class="qty-btn" data-action="minus" data-id="${item.id}">−</button>
-                <span class="qty-display">${qty}</span>
-                <button class="qty-btn" data-action="plus" data-id="${item.id}">+</button>
-              ` : `
-                <button class="add-btn" data-action="add" data-id="${item.id}">加入</button>
-              `}
-            </div>
+            <div class="cart-item-price">¥${(item.price * item.quantity).toFixed(0)}</div>
           </div>
         `;
       }).join('');
+      
+      const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      document.getElementById('total-price').textContent = '¥' + total.toFixed(0);
+      document.getElementById('submit-btn').disabled = false;
     }
 
     function escapeHtml(text) {
@@ -316,144 +234,54 @@
       return div.innerHTML;
     }
 
-    /* SECTION: cart-operations */
-    function addToCart(id) {
-      cart[id] = (cart[id] || 0) + 1;
-      saveCart();
-      renderMenu();
-      updateCartBar();
-    }
-
-    function removeFromCart(id) {
-      if (cart[id] > 1) {
-        cart[id]--;
-      } else {
-        delete cart[id];
-      }
-      saveCart();
-      renderMenu();
-      updateCartBar();
-    }
-
-    function updateCartBar() {
-      const badge = document.getElementById('cart-badge');
-      const total = document.getElementById('cart-total');
-      const checkoutBtn = document.getElementById('checkout-btn');
-      
-      const itemCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
-      const totalPrice = Object.entries(cart).reduce((sum, [id, qty]) => {
-        const item = menuItems.find(i => i.id == id);
-        return sum + (item ? item.price * qty : 0);
-      }, 0);
-
-      if (itemCount > 0) {
-        badge.textContent = itemCount;
-        badge.hidden = false;
-        checkoutBtn.disabled = false;
-      } else {
-        badge.hidden = true;
-        checkoutBtn.disabled = true;
-      }
-      total.textContent = '¥' + totalPrice.toFixed(2);
-    }
-
-    /* SECTION: fetch-menu */
-    async function fetchMenu() {
-      try {
-        const response = await fetch('/api/menu/items');
-        if (!response.ok) throw new Error('获取菜单失败');
-        menuItems = await response.json();
-        renderMenu();
-        updateCartBar();
-      } catch (error) {
-        document.getElementById('menu-list').innerHTML = 
-          '<p style="text-align:center;color:#e74c3c;padding:40px 0;">' + error.message + '</p>';
-      }
-    }
-
-    /* SECTION: fetch-store-name */
-    async function fetchStoreName() {
-      try {
-        const response = await fetch('/api/store/settings');
-        if (response.ok) {
-          const settings = await response.json();
-          if (settings.store_name) {
-            document.getElementById('store-name').textContent = settings.store_name;
-          }
-        }
-      } catch (e) { /* use default name */ }
-    }
-
-    /* SECTION: checkout */
-    function openCheckout() {
-      const modal = document.getElementById('checkout-modal');
-      const cartItemsEl = document.getElementById('cart-items');
-      const modalTotal = document.getElementById('modal-total');
-      
-      const items = Object.entries(cart).map(([id, qty]) => {
-        const item = menuItems.find(i => i.id == id);
-        if (!item) return null;
-        return { ...item, quantity: qty };
-      }).filter(Boolean);
-
-      cartItemsEl.innerHTML = items.map(item => `
-        <div class="cart-item">
-          <div>
-            <div class="cart-item-name">${escapeHtml(item.name)}</div>
-            <div class="cart-item-detail">x${item.quantity}</div>
-          </div>
-          <div class="cart-item-price">¥${(item.price * item.quantity).toFixed(2)}</div>
-        </div>
-      `).join('');
-
-      const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-      modalTotal.textContent = '¥' + totalPrice.toFixed(2);
-      
-      modal.hidden = false;
-    }
-
-    function closeCheckout() {
-      document.getElementById('checkout-modal').hidden = true;
-    }
-
     async function submitOrder() {
-      const customerName = document.getElementById('customer-name').value.trim();
-      const items = Object.entries(cart).map(([id, qty]) => ({
-        id: Number(id),
-        quantity: qty
+      const items = Object.values(cart).map(item => ({
+        id: item.id,
+        quantity: item.quantity,
+        options: item.options,
+        optionNames: item.optionNames
       }));
-
-      const confirmBtn = document.getElementById('confirm-order');
-      confirmBtn.disabled = true;
-      confirmBtn.textContent = '提交中...';
-
+      
+      const customerName = document.getElementById('customer-name').value.trim();
+      const customerPhone = document.getElementById('customer-phone').value.trim();
+      const customerNote = document.getElementById('customer-note').value.trim();
+      
+      const submitBtn = document.getElementById('submit-btn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = '提交中...';
+      
       try {
         const response = await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ customerName, items })
+          body: JSON.stringify({
+            customerName,
+            customerPhone,
+            customerNote,
+            items
+          })
         });
         
         if (!response.ok) {
           const result = await response.json().catch(() => ({}));
           throw new Error(result.error || '提交失败');
         }
-
+        
         const result = await response.json();
         
         // Clear cart
+        deleteCookie('cart');
         cart = {};
-        saveCart();
-        renderMenu();
-        updateCartBar();
-        closeCheckout();
         
         showToast('订单提交成功！订单号: ' + result.orderId);
+        
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 2000);
       } catch (error) {
         showToast(error.message);
-      } finally {
-        confirmBtn.disabled = false;
-        confirmBtn.textContent = '提交订单';
+        submitBtn.disabled = false;
+        submitBtn.textContent = '提交订单';
       }
     }
 
@@ -465,25 +293,11 @@
       setTimeout(() => toast.remove(), 2000);
     }
 
-    /* SECTION: event-listeners */
-    document.getElementById('menu-list').addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-action]');
-      if (!btn) return;
-      const id = btn.dataset.id;
-      const action = btn.dataset.action;
-      
-      if (action === 'add' || action === 'plus') addToCart(id);
-      else if (action === 'minus') removeFromCart(id);
-    });
+    document.getElementById('submit-btn').addEventListener('click', submitOrder);
 
-    document.getElementById('checkout-btn').addEventListener('click', openCheckout);
-    document.getElementById('cancel-checkout').addEventListener('click', closeCheckout);
-    document.getElementById('confirm-order').addEventListener('click', submitOrder);
-
-    /* SECTION: init */
+    // Init
     loadCart();
-    fetchStoreName();
-    fetchMenu();
+    fetchMenu().then(() => renderCart());
   </script>
 </body>
 </html>

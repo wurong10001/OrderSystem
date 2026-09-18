@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>美味餐厅</title>
+  <style>
+    /* SECTION: styles */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      min-height: 100vh;
+    }
+    .header {
+      background: linear-gradient(135deg, #ffd600 0%, #ffab00 100%);
+      padding: 20px 16px;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .header h1 { font-size: 22px; color: #333; font-weight: 700; }
+    .header p { font-size: 13px; color: #666; margin-top: 4px; }
+    
+    .category-tabs {
+      background: #fff;
+      display: flex;
+      overflow-x: auto;
+      padding: 12px 16px;
+      gap: 8px;
+      border-bottom: 1px solid #eee;
+    }
+    .category-tab {
+      padding: 8px 16px;
+      background: #f5f5f5;
+      border-radius: 20px;
+      font-size: 14px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .category-tab.active {
+      background: #ffd600;
+      color: #333;
+      font-weight: 600;
+    }
+    
+    .menu-container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 12px;
+    }
+    
+    .menu-item {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      gap: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      transition: transform 0.2s;
+    }
+    .menu-item:active { transform: scale(0.98); }
+    
+    .menu-item-image {
+      width: 100px;
+      height: 100px;
+      border-radius: 8px;
+      background: #f0f0f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .menu-item-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .menu-item-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .menu-item-name { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .menu-item-desc { font-size: 13px; color: #666; margin-bottom: 8px; line-height: 1.4; }
+    .menu-item-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .menu-item-price { font-size: 18px; color: #ff4d4f; font-weight: 700; }
+    .menu-item-price::before { content: '¥'; font-size: 14px; }
+    
+    .add-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #ffd600;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .add-btn:active { background: #ffab00; }
+    
+    /* SECTION: modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 300;
+    }
+    .modal-overlay[hidden] { display: none; }
+    
+    .modal {
+      background: #fff;
+      border-radius: 16px 16px 0 0;
+      width: 100%;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 24px;
+      animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .modal-title { font-size: 18px; font-weight: 600; }
+    .modal-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #f5f5f5;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    
+    .modal-item-info {
+      display: flex;
+      gap: 16px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #eee;
+      margin-bottom: 20px;
+    }
+    .modal-item-image {
+      width: 80px;
+      height: 80px;
+      border-radius: 8px;
+      background: #f0f0f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .modal-item-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .modal-item-detail { flex: 1; }
+    .modal-item-name { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+    .modal-item-desc { font-size: 13px; color: #666; margin-bottom: 8px; }
+    .modal-item-price { font-size: 20px; color: #ff4d4f; font-weight: 700; }
+    .modal-item-price::before { content: '¥'; font-size: 14px; }
+    
+    .attribute-group {
+      margin-bottom: 20px;
+    }
+    .attribute-label {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .attribute-label .required {
+      color: #ff4d4f;
+      font-size: 12px;
+    }
+    
+    .option-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .option-item {
+      padding: 10px 16px;
+      background: #f5f5f5;
+      border-radius: 20px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 2px solid transparent;
+    }
+    .option-item.selected {
+      background: #fff8e1;
+      border-color: #ffd600;
+      color: #333;
+      font-weight: 500;
+    }
+    .option-item:active { transform: scale(0.95); }
+    
+    .quantity-selector {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 20px 0;
+    }
+    .qty-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #f5f5f5;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .qty-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .qty-btn:active:not(:disabled) { background: #e0e0e0; }
+    .qty-value { font-size: 20px; font-weight: 600; min-width: 40px; text-align: center; }
+    
+    .modal-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+    }
+    .modal-total { font-size: 14px; color: #666; }
+    .modal-total-price { font-size: 24px; color: #ff4d4f; font-weight: 700; }
+    .modal-total-price::before { content: '¥'; font-size: 16px; }
+    
+    .add-to-cart-btn {
+      padding: 14px 32px;
+      background: #ffd600;
+      border: none;
+      border-radius: 24px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(255,214,0,0.4);
+    }
+    .add-to-cart-btn:active { background: #ffab00; }
+    
+    /* SECTION: cart-bar */
+    .cart-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #333;
+      color: #fff;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 200;
+    }
+    .cart-info { display: flex; align-items: center; gap: 12px; }
+    .cart-icon { position: relative; font-size: 24px; }
+    .cart-badge {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: #ff4d4f;
+      color: #fff;
+      font-size: 12px;
+      min-width: 18px;
+      height: 18px;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+    }
+    .cart-total { font-size: 18px; font-weight: 600; }
+    .checkout-btn {
+      padding: 12px 24px;
+      background: #ffd600;
+      color: #333;
+      border: none;
+      border-radius: 24px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .checkout-btn:disabled { background: #666; color: #999; cursor: not-allowed; }
+    .checkout-btn:active:not(:disabled) { background: #ffab00; }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #999;
+    }
+    .empty-state-icon { font-size: 48px; margin-bottom: 16px; }
+    
+    /* SECTION: responsive */
+    @media (max-width: 400px) {
+      .menu-item { padding: 12px; }
+      .menu-item-image { width: 80px; height: 80px; }
+      .menu-item-name { font-size: 15px; }
+      .menu-item-price { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- SECTION: header -->
+  <header class="header">
+    <h1 id="store-name">美味餐厅</h1>
+    <p>新鲜美味，即刻送达</p>
+  </header>
+
+  <!-- SECTION: category-tabs -->
+  <div class="category-tabs" id="category-tabs">
+    <div class="category-tab active" data-category="all">全部</div>
+  </div>
+
+  <!-- SECTION: menu-list -->
+  <main class="menu-container" id="menu-list">
+    <div class="empty-state">
+      <div class="empty-state-icon">🍽️</div>
+      <p>加载中...</p>
+    </div>
+  </main>
+
+  <!-- SECTION: item-modal -->
+  <div class="modal-overlay" id="item-modal" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">选择规格</span>
+        <button class="modal-close" id="modal-close">×</button>
+      </div>
+      
+      <div class="modal-item-info">
+        <div class="modal-item-image" id="modal-image">🍽️</div>
+        <div class="modal-item-detail">
+          <div class="modal-item-name" id="modal-name"></div>
+          <div class="modal-item-desc" id="modal-desc"></div>
+          <div class="modal-item-price" id="modal-price"></div>
+        </div>
+      </div>
+      
+      <div id="modal-attributes"></div>
+      
+      <div class="quantity-selector">
+        <button class="qty-btn" id="qty-minus" disabled>−</button>
+        <span class="qty-value" id="qty-value">1</span>
+        <button class="qty-btn" id="qty-plus">+</button>
+      </div>
+      
+      <div class="modal-footer">
+        <div>
+          <div class="modal-total">合计</div>
+          <div class="modal-total-price" id="modal-total">0</div>
+        </div>
+        <button class="add-to-cart-btn" id="add-to-cart-btn" data-primary-action>加入购物车</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION: cart-bar -->
+  <div class="cart-bar">
+    <div class="cart-info">
+      <span class="cart-icon">
+        🛒
+        <span class="cart-badge" id="cart-badge" hidden>0</span>
+      </span>
+      <span class="cart-total" id="cart-total">¥0</span>
+    </div>
+    <button class="checkout-btn" id="checkout-btn" disabled data-primary-action>去下单</button>
+  </div>
+
+  <script>
+    /* SECTION: state */
+    let menuItems = [];
+    let cart = {};
+    let currentItem = null;
+    let selectedOptions = {};
+    let quantity = 1;
+
+    /* SECTION: cookie-helpers */
+    function setCookie(name, value, days = 1) {
+      const expires = new Date(Date.now() + days * 864e5).toUTCString();
+      document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Strict`;
+    }
+    function getCookie(name) {
+      const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+      return match ? decodeURIComponent(match[1]) : null;
+    }
+    function saveCart() {
+      setCookie('cart', JSON.stringify(cart), 7);
+    }
+    function loadCart() {
+      try {
+        const saved = getCookie('cart');
+        if (saved) cart = JSON.parse(saved);
+      } catch (e) { cart = {}; }
+    }
+
+    /* SECTION: render-menu */
+    function renderMenu(filter = 'all') {
+      const container = document.getElementById('menu-list');
+      const filtered = filter === 'all' ? menuItems : menuItems.filter(item => item.category === filter);
+      
+      if (!filtered.length) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🍽️</div>
+            <p>暂无菜品</p>
+          </div>
+        `;
+        return;
+      }
+      
+      container.innerHTML = filtered.map(item => `
+        <div class="menu-item" data-id="${item.id}">
+          <div class="menu-item-image">
+            ${item.image_url ? `<img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.name)}">` : '🍽️'}
+          </div>
+          <div class="menu-item-info">
+            <div>
+              <div class="menu-item-name">${escapeHtml(item.name)}</div>
+              <div class="menu-item-desc">${escapeHtml(item.description || '美味可口')}</div>
+            </div>
+            <div class="menu-item-bottom">
+              <span class="menu-item-price">${Number(item.price).toFixed(0)}</span>
+              <button class="add-btn" data-action="add" data-id="${item.id}">+</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    /* SECTION: modal */
+    function openModal(itemId) {
+      currentItem = menuItems.find(i => i.id == itemId);
+      if (!currentItem) return;
+      
+      selectedOptions = {};
+      quantity = 1;
+      
+      document.getElementById('modal-name').textContent = currentItem.name;
+      document.getElementById('modal-desc').textContent = currentItem.description || '美味可口';
+      document.getElementById('modal-price').textContent = Number(currentItem.price).toFixed(0);
+      
+      const imageEl = document.getElementById('modal-image');
+      if (currentItem.image_url) {
+        imageEl.innerHTML = `<img src="${escapeHtml(currentItem.image_url)}" alt="${escapeHtml(currentItem.name)}">`;
+      } else {
+        imageEl.innerHTML = '🍽️';
+      }
+      
+      renderAttributes();
+      updateModalTotal();
+      
+      document.getElementById('qty-value').textContent = quantity;
+      document.getElementById('qty-minus').disabled = true;
+      document.getElementById('item-modal').hidden = false;
+    }
+
+    function renderAttributes() {
+      const container = document.getElementById('modal-attributes');
+      if (!currentItem.attributes || !currentItem.attributes.length) {
+        container.innerHTML = '';
+        return;
+      }
+      
+      container.innerHTML = currentItem.attributes.map(attr => `
+        <div class="attribute-group">
+          <div class="attribute-label">
+            ${escapeHtml(attr.name)}
+            ${attr.required ? '<span class="required">必选</span>' : ''}
+          </div>
+          <div class="option-list">
+            ${attr.options.map(opt => `
+              <div class="option-item" data-attr="${attr.id}" data-option="${opt.id}">
+                ${escapeHtml(opt.value)}
+                ${opt.priceAdjustment > 0 ? ` +¥${Number(opt.priceAdjustment).toFixed(0)}` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+      
+      // Bind option click events
+      container.querySelectorAll('.option-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const attrId = el.dataset.attr;
+          const optionId = el.dataset.option;
+          
+          // Deselect others in same attribute
+          container.querySelectorAll(`.option-item[data-attr="${attrId}"]`).forEach(o => o.classList.remove('selected'));
+          el.classList.add('selected');
+          
+          selectedOptions[attrId] = optionId;
+          updateModalTotal();
+        });
+      });
+    }
+
+    function updateModalTotal() {
+      let total = Number(currentItem.price);
+      
+      // Add price adjustments
+      if (currentItem.attributes) {
+        for (const attr of currentItem.attributes) {
+          const selectedOptionId = selectedOptions[attr.id];
+          if (selectedOptionId) {
+            const option = attr.options.find(o => o.id == selectedOptionId);
+            if (option) total += Number(option.priceAdjustment);
+          }
+        }
+      }
+      
+      total *= quantity;
+      document.getElementById('modal-total').textContent = total.toFixed(0);
+    }
+
+    function closeModal() {
+      document.getElementById('item-modal').hidden = true;
+      currentItem = null;
+      selectedOptions = {};
+      quantity = 1;
+    }
+
+    /* SECTION: cart-operations */
+    function addToCart() {
+      if (!currentItem) return;
+      
+      // Validate required attributes
+      if (currentItem.attributes) {
+        for (const attr of currentItem.attributes) {
+          if (attr.required && !selectedOptions[attr.id]) {
+            alert(`请选择${attr.name}`);
+            return;
+          }
+        }
+      }
+      
+      const cartKey = `${currentItem.id}_${Object.values(selectedOptions).sort().join('_')}`;
+      
+      if (!cart[cartKey]) {
+        cart[cartKey] = {
+          id: currentItem.id,
+          name: currentItem.name,
+          price: Number(currentItem.price),
+          quantity: 0,
+          options: { ...selectedOptions },
+          optionNames: {}
+        };
+        
+        // Store option names
+        if (currentItem.attributes) {
+          for (const attr of currentItem.attributes) {
+            const selectedOptionId = selectedOptions[attr.id];
+            if (selectedOptionId) {
+              const option = attr.options.find(o => o.id == selectedOptionId);
+              if (option) {
+                cart[cartKey].optionNames[attr.name] = option.value;
+                cart[cartKey].price += Number(option.priceAdjustment);
+              }
+            }
+          }
+        }
+      }
+      
+      cart[cartKey].quantity += quantity;
+      saveCart();
+      updateCartBar();
+      closeModal();
+    }
+
+    function updateCartBar() {
+      const badge = document.getElementById('cart-badge');
+      const total = document.getElementById('cart-total');
+      const checkoutBtn = document.getElementById('checkout-btn');
+      
+      const itemCount = Object.values(cart).reduce((sum, item) => sum + item.quantity, 0);
+      const totalPrice = Object.values(cart).reduce((sum, item) => sum + item.price * item.quantity, 0);
+      
+      if (itemCount > 0) {
+        badge.textContent = itemCount;
+        badge.hidden = false;
+        checkoutBtn.disabled = false;
+      } else {
+        badge.hidden = true;
+        checkoutBtn.disabled = true;
+      }
+      total.textContent = '¥' + totalPrice.toFixed(0);
+    }
+
+    /* SECTION: fetch-menu */
+    async function fetchMenu() {
+      try {
+        const response = await fetch('/api/menu/items');
+        if (!response.ok) throw new Error('获取菜单失败');
+        menuItems = await response.json();
+        renderMenu();
+        updateCartBar();
+      } catch (error) {
+        document.getElementById('menu-list').innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">⚠️</div>
+            <p>${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    /* SECTION: fetch-store-name */
+    async function fetchStoreName() {
+      try {
+        const response = await fetch('/api/store/settings');
+        if (response.ok) {
+          const settings = await response.json();
+          if (settings.store_name) {
+            document.getElementById('store-name').textContent = settings.store_name;
+          }
+        }
+      } catch (e) { /* use default name */ }
+    }
+
+    /* SECTION: event-listeners */
+    document.getElementById('menu-list').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action="add"]');
+      if (btn) {
+        openModal(btn.dataset.id);
+      }
+    });
+
+    document.getElementById('modal-close').addEventListener('click', closeModal);
+    document.getElementById('item-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'item-modal') closeModal();
+    });
+
+    document.getElementById('qty-minus').addEventListener('click', () => {
+      if (quantity > 1) {
+        quantity--;
+        document.getElementById('qty-value').textContent = quantity;
+        document.getElementById('qty-minus').disabled = quantity <= 1;
+        updateModalTotal();
+      }
+    });
+
+    document.getElementById('qty-plus').addEventListener('click', () => {
+      quantity++;
+      document.getElementById('qty-value').textContent = quantity;
+      document.getElementById('qty-minus').disabled = false;
+      updateModalTotal();
+    });
+
+    document.getElementById('add-to-cart-btn').addEventListener('click', addToCart);
+
+    document.getElementById('checkout-btn').addEventListener('click', () => {
+      window.location.href = '/ordering';
+    });
+
+    /* SECTION: init */
+    loadCart();
+    fetchStoreName();
+    fetchMenu();
+  </script>
+</body>
+</html>
