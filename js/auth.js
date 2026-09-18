@@ -114,8 +114,16 @@ async function submitAuth(event) {
     clearTimeout(timeoutId);
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || "请求失败，请稍后重试。");
-    setMessage(page === "register" ? "注册成功，即将前往登录页面。" : "登录成功。", "success");
-    if (page === "register") setTimeout(() => { window.location.href = "/"; }, 800);
+
+    if (page === "register") {
+      setMessage("注册成功，即将前往登录页面。", "success");
+      setTimeout(() => { window.location.href = "/admin"; }, 800);
+    } else {
+      setMessage("登录成功，正在跳转…", "success");
+      const role = result.role || "user";
+      const target = role === "admin" ? "/admin/menu" : (role === "delivery" ? "/admin/orders" : "/");
+      setTimeout(() => { window.location.href = target; }, 400);
+    }
   } catch (error) {
     if (error.name === "AbortError") {
       setMessage("请求超时，请检查网络后重试。");

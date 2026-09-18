@@ -132,7 +132,7 @@ async function loadAttributes() {
   const attributes = await response.json();
   
   if (!attributes.length) {
-    attrsList.innerHTML = "<p style='color:#999;'>暂无属性，点击"添加属性"开始配置</p>";
+    attrsList.innerHTML = "<p style='color:#999;'>暂无属性，点击「添加属性」开始配置</p>";
     return;
   }
   

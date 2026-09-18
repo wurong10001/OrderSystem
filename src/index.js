@@ -6,10 +6,12 @@ import registerHtml from "../html/register.html";
 import adminMenuHtml from "../html/admin-menu.html";
 import orderingHtml from "../html/ordering.html";
 import adminUsersHtml from "../html/admin-users.html";
+import adminOrdersHtml from "../html/admin-orders.html";
 import authCss from "../css/auth.css";
 import authJs from "../js/auth.js";
 import adminMenuJs from "../js/admin-menu.js";
 import adminUsersJs from "../js/admin-users.js";
+import adminOrdersJs from "../js/admin-orders.js";
 
 export { OrderWorkflow };
 
@@ -20,15 +22,16 @@ function assetResponse(content, contentType) {
 }
 
 function database(env) {
-  const connectionString = env.DATABASE_URL;
+  const connectionString = env.DATABASE_URL || env.DATABASE_URL_DIRECT;
   if (!connectionString) {
-    throw new Error("DATABASE_URL secret is not configured");
+    throw new Error("数据库未配置：请设置 DATABASE_URL 环境变量");
   }
   return postgres(connectionString, {
     prepare: false,
+    fetch_types: false,
     max: 1,
-    connection: { timeout: 10000 },
     idle_timeout: 10,
+    connect_timeout: 10,
   });
 }
 
@@ -70,21 +73,32 @@ async function signSession(payload, secret) {
   return `${encoded}.${base64Url(signature)}`;
 }
 
-async function validSession(request, env) {
+async function readSession(request, env) {
   const token = parseCookies(request).ordersystem_admin;
   const secret = env.ADMIN_SESSION_SECRET;
-  if (!token || !secret) return false;
+  if (!token || !secret) return null;
   const [encoded, signature] = token.split(".");
-  if (!encoded || !signature) return false;
+  if (!encoded || !signature) return null;
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
   const expected = Uint8Array.from(atob(signature.replace(/-/g, "+").replace(/_/g, "/") + "=="), (char) => char.charCodeAt(0));
   const valid = await crypto.subtle.verify("HMAC", key, expected, new TextEncoder().encode(encoded));
-  if (!valid) return false;
-  const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(
-    atob(encoded.replace(/-/g, "+").replace(/_/g, "/") + "=="), (char) => char.charCodeAt(0),
-  )));
-  return payload.exp > Date.now() && payload.permission === 1 && typeof payload.username === "string";
+  if (!valid) return null;
+  let payload;
+  try {
+    payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(
+      atob(encoded.replace(/-/g, "+").replace(/_/g, "/") + "=="), (char) => char.charCodeAt(0),
+    )));
+  } catch {
+    return null;
+  }
+  if (!(payload.exp > Date.now()) || typeof payload.username !== "string") return null;
+  return payload;
+}
+
+async function validSession(request, env) {
+  const payload = await readSession(request, env);
+  return !!payload && payload.permission === 1;
 }
 
 function adminCookie(token, maxAge = 86400) {
@@ -299,12 +313,11 @@ async function adminRequest(request, env, pathname) {
       const body = await jsonBody(request);
       const targetUserId = userMatch[1];
       
-      // Get current user from session
-      const token = parseCookies(request).ordersystem_admin;
-      const [encoded] = token.split(".");
-      const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(
-        atob(encoded.replace(/-/g, "+").replace(/_/g, "/") + "=="), (char) => char.charCodeAt(0),
-      )));
+      // Get current user from session (signature already verified)
+      const payload = await readSession(request, env);
+      if (!payload) {
+        return Response.json({ error: "需要管理员登录。" }, { status: 401 });
+      }
       
       // Prevent modifying own permissions
       const [currentUser] = await sql`
@@ -423,7 +436,7 @@ async function authRequest(request, env, pathname) {
       }
 
       const [user] = await sql`
-        select password_hash
+        select id, username, password_hash, role, permission
         from public.app_users
         where username_normalized = ${body.username.trim().toLowerCase()}
         limit 1
@@ -431,7 +444,35 @@ async function authRequest(request, env, pathname) {
       if (!user || user.password_hash.toLowerCase() !== body.passwordHash.toLowerCase()) {
         return Response.json({ error: "用户名或密码错误。" }, { status: 401 });
       }
-      return Response.json({ ok: true });
+      if (!env.ADMIN_SESSION_SECRET) {
+        return Response.json({ error: "ADMIN_SESSION_SECRET 未配置。" }, { status: 503 });
+      }
+
+      const role = user.role || "user";
+      const token = await signSession({
+        userId: user.id,
+        username: user.username,
+        role,
+        permission: user.permission ?? 0,
+        exp: Date.now() + 86400000,
+      }, env.ADMIN_SESSION_SECRET);
+
+      return new Response(JSON.stringify({ ok: true, role, username: user.username }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Set-Cookie": adminCookie(token) },
+      });
+    }
+
+    if (pathname === "/api/auth/me" && request.method === "GET") {
+      const payload = await readSession(request, env);
+      if (!payload) return Response.json({ error: "未登录。" }, { status: 401 });
+      return Response.json({ username: payload.username, role: payload.role || "user", permission: payload.permission ?? 0 });
+    }
+
+    if (pathname === "/api/auth/logout" && request.method === "POST") {
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { "Content-Type": "application/json", "Set-Cookie": adminCookie("", 0) },
+      });
     }
 
     return null;
@@ -494,6 +535,15 @@ export default {
       return assetResponse(adminUsersHtml, "text/html");
     }
 
+    // Orders page: accessible to admin and delivery roles
+    if (request.method === "GET" && url.pathname === "/admin/orders") {
+      const session = await readSession(request, env);
+      if (!session || (session.permission !== 1 && session.role !== "delivery")) {
+        return Response.redirect(new URL("/admin", request.url), 302);
+      }
+      return assetResponse(adminOrdersHtml, "text/html");
+    }
+
     if (request.method === "GET" && url.pathname === "/register") {
       return assetResponse(registerHtml, "text/html");
     }
@@ -512,6 +562,10 @@ export default {
 
     if (request.method === "GET" && url.pathname === "/js/admin-users.js") {
       return assetResponse(adminUsersJs, "text/javascript");
+    }
+
+    if (request.method === "GET" && url.pathname === "/js/admin-orders.js") {
+      return assetResponse(adminOrdersJs, "text/javascript");
     }
 
     if (request.method === "GET" && url.pathname === "/ordering") {
@@ -589,23 +643,15 @@ export default {
     if (url.pathname === "/api/orders" && request.method === "GET") {
       try {
         const sql = database(env);
-        const cookies = parseCookies(request);
-        const token = cookies.ordersystem_admin;
-        
-        // Check if admin
-        let isAdmin = false;
-        let userId = null;
-        if (token) {
-          try {
-            const [encoded] = token.split(".");
-            const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(
-              atob(encoded.replace(/-/g, "+").replace(/_/g, "/") + "=="), (char) => char.charCodeAt(0),
-            )));
-            if (payload.exp > Date.now()) {
-              isAdmin = payload.permission === 1;
-              userId = payload.userId;
-            }
-          } catch (e) { /* ignore */ }
+        const session = await readSession(request, env);
+
+        const isAdmin = !!session && session.permission === 1;
+        const isDelivery = !!session && session.role === "delivery";
+        const userId = session?.userId || null;
+
+        if (!session || (!isAdmin && !isDelivery)) {
+          await sql.end({ timeout: 1 });
+          return Response.json({ error: "需要登录，且角色为管理员或外卖员。" }, { status: 401 });
         }
 
         let orders;
@@ -619,7 +665,7 @@ export default {
             order by o.created_at desc
             limit 100
           `;
-        } else if (userId) {
+        } else {
           // Delivery person sees only their assigned orders
           orders = await sql`
             select o.*,
@@ -630,9 +676,6 @@ export default {
             order by o.created_at desc
             limit 100
           `;
-        } else {
-          await sql.end({ timeout: 1 });
-          return Response.json({ error: "需要登录" }, { status: 401 });
         }
         
         await sql.end({ timeout: 1 });
@@ -646,26 +689,22 @@ export default {
     if (url.pathname.match(/^\/api\/orders\/(\d+)\/accept$/) && request.method === "PATCH") {
       try {
         const sql = database(env);
-        const cookies = parseCookies(request);
-        const token = cookies.ordersystem_admin;
-        
-        if (!token) {
+        const session = await readSession(request, env);
+
+        if (!session) {
           await sql.end({ timeout: 1 });
           return Response.json({ error: "需要登录" }, { status: 401 });
         }
 
-        const [encoded] = token.split(".");
-        const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(
-          atob(encoded.replace(/-/g, "+").replace(/_/g, "/") + "=="), (char) => char.charCodeAt(0),
-        )));
-        
-        if (payload.exp <= Date.now()) {
+        const isDelivery = session.role === "delivery";
+        const isAdmin = session.permission === 1;
+        if (!isDelivery && !isAdmin) {
           await sql.end({ timeout: 1 });
-          return Response.json({ error: "登录已过期" }, { status: 401 });
+          return Response.json({ error: "只有外卖员可以接单。" }, { status: 403 });
         }
 
         const orderId = Number(url.pathname.match(/^\/api\/orders\/(\d+)\/accept$/)[1]);
-        const userId = payload.userId;
+        const userId = session.userId;
 
         const [order] = await sql`
           update public.orders

@@ -17,7 +17,8 @@
         "**/css/*.css",
         "**/js/auth.js",
         "**/js/admin-menu.js",
-        "**/js/admin-users.js"
+        "**/js/admin-users.js",
+        "**/js/admin-orders.js"
       ],
       "fallthrough": false
     }
