@@ -61,7 +61,9 @@ function sm3(messageText) {
       a ^ aa, b ^ bb, c ^ cc, d ^ dd, e ^ ee, f ^ ffv, g ^ ggV, h ^ hh,
     ];
   }
-  return [a, b, c, d, e, f, g, h].map((value) => value.toString(16).padStart(8, "0")).join("");
+  return [a, b, c, d, e, f, g, h]
+    .map((value) => (value >>> 0).toString(16).padStart(8, "0"))
+    .join("");
 }
 
 async function submitAuth(event) {
